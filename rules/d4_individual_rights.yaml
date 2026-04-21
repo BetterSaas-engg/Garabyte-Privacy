@@ -1,0 +1,150 @@
+dimension_id: d4
+dimension_name: Individual Rights Handling
+dimension_weight: 0.12
+description: >
+  Measures how well the organization handles Data Subject Access Requests
+  (DSARs), deletion requests, and correction requests. Process, SLA,
+  volume tracking.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 9 — Individual Access"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 27 — Right to access"
+      - "s. 28 — Right to rectification"
+  - regulation: GDPR
+    clauses:
+      - "Art. 15 — Right of access"
+      - "Art. 16 — Right to rectification"
+      - "Art. 17 — Right to erasure"
+      - "Art. 20 — Right to data portability"
+      - "Art. 21 — Right to object"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No process for individual rights requests. Ignored or handled case by case.
+  1:
+    label: Developing
+    description: Informal process. Response times inconsistent.
+  2:
+    label: Defined
+    description: Documented process. Response times within statutory limits.
+  3:
+    label: Managed
+    description: Tracked process with SLAs. Deletion propagates across systems.
+  4:
+    label: Optimized
+    description: Self-service portal. Automated identity verification and fulfillment.
+
+questions:
+  - id: d4_q1
+    text: Is there a documented process for handling DSARs?
+    answer_type: single_select
+    weight: 0.25
+    options:
+      - value: 0
+        label: No process
+      - value: 1
+        label: Handled ad hoc when requests arrive
+      - value: 2
+        label: Documented process, followed inconsistently
+      - value: 3
+        label: Documented process with assigned owner and SLA
+      - value: 4
+        label: Automated workflow with identity verification and tracking
+
+  - id: d4_q2
+    text: Do you track DSAR volume and response times?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No tracking
+      - value: 1
+        label: Informal tracking, no metrics
+      - value: 2
+        label: Manual log of volume and response times
+      - value: 3
+        label: Tracked in a ticketing system with metrics
+      - value: 4
+        label: Dashboard with real-time metrics reported to leadership
+
+  - id: d4_q3
+    text: Can you fulfill deletion requests across all systems holding the data?
+    answer_type: single_select
+    weight: 0.25
+    options:
+      - value: 0
+        label: No, we cannot reliably delete
+      - value: 1
+        label: Partially, with significant manual effort
+      - value: 2
+        label: Yes for primary systems, uncertain for backups and third parties
+      - value: 3
+        label: Yes across all systems including backups within 30 days
+      - value: 4
+        label: Automated deletion propagation with full audit trail
+
+  - id: d4_q4
+    text: Do you meet statutory response deadlines (30 days PIPEDA, 30 days Law 25, 30 days GDPR)?
+    answer_type: single_select
+    weight: 0.20
+    regulatory_note: Missing statutory deadlines is a common regulator complaint trigger.
+    options:
+      - value: 0
+        label: We frequently miss deadlines
+      - value: 1
+        label: Meet deadlines sometimes, no tracking
+      - value: 2
+        label: Usually meet deadlines, occasional breach
+      - value: 3
+        label: Consistently meet deadlines, tracked
+      - value: 4
+        label: Well within deadlines with reserved capacity for peak volume
+
+  - id: d4_q5
+    text: Is the DSAR intake channel visible and accessible to individuals?
+    answer_type: single_select
+    weight: 0.10
+    options:
+      - value: 0
+        label: No public-facing intake channel
+      - value: 1
+        label: Email address in privacy notice only
+      - value: 2
+        label: Dedicated contact form
+      - value: 3
+        label: Prominent self-service intake with identity verification
+      - value: 4
+        label: Self-service portal with status tracking and secure delivery
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: No defensible DSAR process — high regulator exposure
+    recommendation: >
+      Stand up a baseline DSAR intake and fulfillment process within 60 days.
+      Missing statutory response deadlines is one of the most common triggers
+      for regulator investigations under PIPEDA and Law 25.
+    regulatory_risk: Individual complaints to privacy commissioners frequently arise from ignored or delayed DSARs.
+    typical_consulting_hours: 32
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Process exists but deletion propagation is incomplete
+    recommendation: >
+      Map all systems holding personal data and build a deletion propagation
+      workflow. Pay particular attention to backups and third-party processors
+      where deletion is often incomplete.
+    typical_consulting_hours: 20
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Solid DSAR handling but manual
+    recommendation: >
+      Evaluate DSAR automation tools to reduce per-request effort and improve
+      response times. Self-service portals reduce volume and improve user experience.
+    typical_consulting_hours: 10
