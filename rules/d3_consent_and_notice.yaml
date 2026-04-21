@@ -1,0 +1,154 @@
+dimension_id: d3
+dimension_name: Consent & Notice
+dimension_weight: 0.12
+description: >
+  Measures whether individuals are informed about data collection and given
+  meaningful choice. Covers privacy notices, consent capture, and CASL
+  compliance for electronic messaging.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 2 — Identifying Purposes"
+      - "Principle 3 — Consent"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 8"
+      - "s. 14"
+  - regulation: CASL
+    clauses:
+      - "s. 6 — express consent for commercial electronic messages"
+  - regulation: GDPR
+    clauses:
+      - "Art. 6"
+      - "Art. 7"
+      - "Art. 13"
+      - "Art. 14"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No standard privacy notice. Consent not captured or documented.
+  1:
+    label: Developing
+    description: Basic privacy notice exists. Consent captured inconsistently.
+  2:
+    label: Defined
+    description: Privacy notice reviewed annually. Consent captured and stored for key flows.
+  3:
+    label: Managed
+    description: Layered notices by context. Consent records auditable. Withdrawal propagates downstream.
+  4:
+    label: Optimized
+    description: Dynamic consent management platform. Real-time consent state across all systems.
+
+questions:
+  - id: d3_q1
+    text: Do your privacy notices clearly explain what data you collect and why?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Link to the current public privacy notice.
+    options:
+      - value: 0
+        label: No privacy notice
+      - value: 1
+        label: Generic notice, not specific to our actual practices
+      - value: 2
+        label: Accurate notice, reviewed annually
+      - value: 3
+        label: Layered notices tailored by context (web, app, product)
+      - value: 4
+        label: Just-in-time notices shown at point of collection
+
+  - id: d3_q2
+    text: Do you capture and store evidence of consent (when, how, what was disclosed)?
+    answer_type: single_select
+    weight: 0.25
+    options:
+      - value: 0
+        label: Consent is not recorded
+      - value: 1
+        label: Consent recorded in some systems but not centrally
+      - value: 2
+        label: Central consent log for primary channels
+      - value: 3
+        label: Comprehensive consent log with full audit trail
+      - value: 4
+        label: Immutable consent records integrated across all touchpoints
+
+  - id: d3_q3
+    text: Are consent mechanisms tailored for sensitive data (health, biometrics, children)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No distinction for sensitive data
+      - value: 1
+        label: Some additional handling, not systematic
+      - value: 2
+        label: Explicit opt-in for sensitive categories
+      - value: 3
+        label: Explicit opt-in with enhanced disclosure and parental controls
+      - value: 4
+        label: Granular purpose-specific consent with ongoing re-confirmation
+
+  - id: d3_q4
+    text: Is CASL express consent handled correctly for commercial electronic messages?
+    answer_type: single_select
+    weight: 0.15
+    regulatory_note: CASL violations carry administrative monetary penalties up to $10M per violation for organizations.
+    options:
+      - value: 0
+        label: We do not track CASL consent
+      - value: 1
+        label: Ad hoc tracking, unclear implied vs express
+      - value: 2
+        label: Consent captured, basic records kept
+      - value: 3
+        label: Clear distinction between express and implied, renewal tracked
+      - value: 4
+        label: Automated CASL consent lifecycle with expiry reminders
+
+  - id: d3_q5
+    text: Can individuals easily withdraw consent and have that reflected downstream?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No withdrawal mechanism
+      - value: 1
+        label: Withdrawal possible but manual and slow
+      - value: 2
+        label: Withdrawal mechanism available, propagates to primary systems
+      - value: 3
+        label: One-click withdrawal, propagates across all systems within 48 hours
+      - value: 4
+        label: Real-time withdrawal propagation with audit trail
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Consent capture is ad hoc, regulatory defensibility is low
+    recommendation: >
+      Implement baseline consent capture for your top 3 data flows (marketing,
+      product, analytics). Draft a compliant privacy notice aligned with PIPEDA,
+      Law 25, and CASL. This is foundational before any other consent work.
+    regulatory_risk: High — CASL and Law 25 both carry significant penalties and easy-to-prove violations.
+    typical_consulting_hours: 30
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Consent captured but downstream propagation is weak
+    recommendation: >
+      Map all systems that receive consent-gated data. Implement a consent
+      propagation process so withdrawal in one system reflects everywhere
+      within 48 hours.
+    typical_consulting_hours: 20
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Consent operations strong but not yet dynamic
+    recommendation: >
+      Evaluate consent management platforms (CMPs) to automate lifecycle
+      management, especially for CASL renewal tracking.
+    typical_consulting_hours: 10
