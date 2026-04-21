@@ -1,0 +1,154 @@
+dimension_id: d1
+dimension_name: Governance & Accountability
+dimension_weight: 0.15
+description: >
+  Measures whether the organization has clear accountability for privacy —
+  a designated privacy officer, written policies, board-level oversight,
+  and a defined privacy program structure. This is the foundation every
+  other dimension rests on.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 1 — Accountability"
+      - "s. 4.1.1"
+      - "s. 4.1.4"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 3.1"
+      - "s. 3.2"
+  - regulation: GDPR
+    clauses:
+      - "Art. 37"
+      - "Art. 38"
+      - "Art. 39"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No designated privacy owner. No written policy. Privacy handled reactively.
+  1:
+    label: Developing
+    description: Privacy owner exists informally. Draft policy. No regular review.
+  2:
+    label: Defined
+    description: Formal privacy officer role. Approved policy. Annual review.
+  3:
+    label: Managed
+    description: Privacy officer with authority and budget. Policies reviewed and tested. Board reporting.
+  4:
+    label: Optimized
+    description: Privacy embedded in strategy. Continuous improvement. Privacy metrics on executive scorecard.
+
+questions:
+  - id: d1_q1
+    text: Does your organization have a designated privacy officer or equivalent role?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Upload the privacy officer's appointment letter or job description.
+    options:
+      - value: 0
+        label: No one is responsible
+      - value: 1
+        label: Informally assigned to someone with other duties
+      - value: 2
+        label: Formally appointed, part-time responsibility
+      - value: 3
+        label: Formally appointed, full-time with budget authority
+      - value: 4
+        label: Executive-level CPO reporting to CEO or board
+
+  - id: d1_q2
+    text: Is there a board-approved privacy policy that is reviewed regularly?
+    answer_type: single_select
+    weight: 0.20
+    evidence_prompt: Upload the current privacy policy and most recent review record.
+    options:
+      - value: 0
+        label: No written privacy policy
+      - value: 1
+        label: Draft policy exists, not approved
+      - value: 2
+        label: Approved policy, reviewed ad hoc
+      - value: 3
+        label: Approved policy, reviewed annually
+      - value: 4
+        label: Approved policy, reviewed annually with measurable outcomes
+
+  - id: d1_q3
+    text: Does the board or executive team receive regular privacy program reports?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No executive reporting
+      - value: 1
+        label: Reactive reporting only during incidents
+      - value: 2
+        label: Annual report
+      - value: 3
+        label: Quarterly report with key metrics
+      - value: 4
+        label: Continuous dashboard plus quarterly board review
+
+  - id: d1_q4
+    text: Is privacy accountability documented across business units (not just in IT or Legal)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Privacy is seen as IT's problem
+      - value: 1
+        label: Privacy shared between IT and Legal only
+      - value: 2
+        label: Privacy contacts named in major business units
+      - value: 3
+        label: Privacy champions trained in every business unit
+      - value: 4
+        label: Privacy accountability built into every role via RACI
+
+  - id: d1_q5
+    text: Does your organization maintain a record of processing activities (ROPA)?
+    answer_type: single_select
+    weight: 0.20
+    regulatory_note: Required under GDPR Art. 30 and strongly recommended under Quebec Law 25.
+    options:
+      - value: 0
+        label: No record maintained
+      - value: 1
+        label: Informal spreadsheet, partially complete
+      - value: 2
+        label: Documented ROPA, updated annually
+      - value: 3
+        label: Documented ROPA, updated on change plus annually
+      - value: 4
+        label: Living ROPA integrated with data inventory tooling
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: No clear accountability structure for privacy
+    recommendation: >
+      Appoint a privacy officer (even part-time) and draft a baseline privacy policy
+      within 60 days. This is the single highest-leverage action you can take —
+      without accountability, no other privacy control is defensible to regulators.
+    regulatory_risk: PIPEDA Principle 1 non-compliance — privacy commissioner may order structural remediation following a complaint.
+    typical_consulting_hours: 20
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Privacy program exists but lacks executive visibility
+    recommendation: >
+      Establish quarterly board or executive reporting with 3-5 key privacy metrics
+      (DSAR volume, incidents, training completion, PIA coverage, vendor risk).
+      Formalize the privacy officer's budget and mandate in writing.
+    typical_consulting_hours: 12
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Program mature but not strategically integrated
+    recommendation: >
+      Move privacy from a compliance function to a strategic one. Add privacy
+      metrics to executive scorecards. Build privacy champions network across
+      business units with quarterly training.
+    typical_consulting_hours: 8
