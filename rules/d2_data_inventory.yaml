@@ -1,0 +1,149 @@
+dimension_id: d2
+dimension_name: Data Inventory & Mapping
+dimension_weight: 0.15
+description: >
+  Measures whether the organization knows what personal data it holds,
+  where it lives, why it was collected, and how it flows between systems.
+  You cannot protect what you cannot see.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 4 — Limiting Collection"
+      - "Principle 5 — Limiting Use, Disclosure, and Retention"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 3.3 — Privacy governance policies"
+      - "s. 12"
+  - regulation: GDPR
+    clauses:
+      - "Art. 30 — Records of processing activities"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No inventory exists. Data sprawl is unknown.
+  1:
+    label: Developing
+    description: Partial spreadsheet inventory of major systems.
+  2:
+    label: Defined
+    description: Documented inventory of systems holding personal data, updated annually.
+  3:
+    label: Managed
+    description: Inventory updated on system change, includes data flows and retention periods.
+  4:
+    label: Optimized
+    description: Automated discovery tooling, real-time inventory, automated classification engine.
+
+questions:
+  - id: d2_q1
+    text: Do you have a documented inventory of systems that hold personal data?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Upload your data inventory or ROPA document.
+    options:
+      - value: 0
+        label: No inventory
+      - value: 1
+        label: Informal list for some systems
+      - value: 2
+        label: Documented for major systems, updated annually
+      - value: 3
+        label: Documented for all systems, updated on change
+      - value: 4
+        label: Automated discovery with continuous updates
+
+  - id: d2_q2
+    text: Do you document data flows between internal systems and to third parties?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Flows are not documented
+      - value: 1
+        label: Partial diagrams for critical systems
+      - value: 2
+        label: Data flow maps for major systems
+      - value: 3
+        label: Comprehensive flow maps, reviewed annually
+      - value: 4
+        label: Living data lineage integrated with discovery tools
+
+  - id: d2_q3
+    text: Is personal data classified by sensitivity (public / internal / confidential / regulated)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No classification scheme
+      - value: 1
+        label: Classification exists but not applied
+      - value: 2
+        label: Applied to major datasets
+      - value: 3
+        label: Applied consistently across the organization
+      - value: 4
+        label: Automated classification with DLP enforcement
+
+  - id: d2_q4
+    text: Do you have documented retention periods for each category of personal data?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No retention policy
+      - value: 1
+        label: General retention policy, not category-specific
+      - value: 2
+        label: Category-specific retention documented
+      - value: 3
+        label: Category-specific retention enforced via tooling
+      - value: 4
+        label: Automated lifecycle management end-to-end
+
+  - id: d2_q5
+    text: Can you produce the inventory on demand for a regulator, within 30 days?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No, we would struggle significantly
+      - value: 1
+        label: Partially, with major gaps
+      - value: 2
+        label: Yes, with two weeks of preparation
+      - value: 3
+        label: Yes, within a few days
+      - value: 4
+        label: Yes, immediately via dashboard
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Organization has limited visibility into its own personal data
+    recommendation: >
+      Start with a targeted data inventory of your top 10 systems that hold
+      personal data. This can be done in 4-6 weeks with structured interviews
+      plus system owner questionnaires. Without this, nothing else in your
+      privacy program is defensible.
+    regulatory_risk: A regulator request under Law 25 or PIPEDA would likely fail, triggering broader audit.
+    typical_consulting_hours: 40
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Inventory exists but is stale or incomplete
+    recommendation: >
+      Move from annual manual updates to change-triggered updates, and add
+      data flow documentation. Consider light tooling (not full enterprise
+      catalog) to reduce manual effort.
+    typical_consulting_hours: 24
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Inventory is solid but not yet automated
+    recommendation: >
+      Evaluate automated data discovery tools to reduce manual maintenance
+      burden and improve coverage of shadow IT. Integrate with classification
+      and retention tooling.
+    typical_consulting_hours: 12
