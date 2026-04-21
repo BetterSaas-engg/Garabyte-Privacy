@@ -1,0 +1,147 @@
+dimension_id: d5
+dimension_name: Vendor & Third-Party Management
+dimension_weight: 0.12
+description: >
+  Measures whether vendors handling personal data are assessed, contracted
+  with data processing agreements (DPAs), and monitored. Sub-processor
+  visibility matters critically under Quebec Law 25.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 1 — Accountability for transfers"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 17 — Cross-border transfer assessment"
+      - "s. 18.3 — Third-party disclosure"
+  - regulation: GDPR
+    clauses:
+      - "Art. 28 — Processors"
+      - "Art. 44-49 — International transfers"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No vendor privacy review. DPAs not used.
+  1:
+    label: Developing
+    description: Privacy review for some new vendors. DPAs for major contracts.
+  2:
+    label: Defined
+    description: Privacy intake for all new vendors handling personal data. Standard DPA.
+  3:
+    label: Managed
+    description: Risk-tiered assessments. Sub-processor register. Reassessment cadence.
+  4:
+    label: Optimized
+    description: Automated vendor risk monitoring. Real-time register. Continuous assessment.
+
+questions:
+  - id: d5_q1
+    text: Is there a vendor intake process that includes a privacy risk assessment?
+    answer_type: single_select
+    weight: 0.25
+    options:
+      - value: 0
+        label: No intake process
+      - value: 1
+        label: Intake exists but no privacy review
+      - value: 2
+        label: Privacy review for major vendors
+      - value: 3
+        label: Risk-tiered privacy assessment for all vendors
+      - value: 4
+        label: Automated tiered assessment with continuous monitoring
+
+  - id: d5_q2
+    text: Do all vendors handling personal data have a signed DPA (Data Processing Agreement)?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Upload a sample DPA template you use.
+    options:
+      - value: 0
+        label: No DPAs in use
+      - value: 1
+        label: DPAs for some vendors, inconsistent
+      - value: 2
+        label: DPAs for major vendors, standard template
+      - value: 3
+        label: DPAs for all processor vendors, reviewed by legal
+      - value: 4
+        label: DPAs for all relevant vendors with automated renewal and version tracking
+
+  - id: d5_q3
+    text: Do you maintain a sub-processor register?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No register
+      - value: 1
+        label: Informal tracking in some contracts
+      - value: 2
+        label: Register for major vendors
+      - value: 3
+        label: Complete register, updated when vendors add sub-processors
+      - value: 4
+        label: Real-time register with automated notifications of changes
+
+  - id: d5_q4
+    text: Are vendor re-assessments scheduled at a defined cadence?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No re-assessments
+      - value: 1
+        label: Ad hoc re-assessments
+      - value: 2
+        label: Annual re-assessments for major vendors
+      - value: 3
+        label: Risk-tiered re-assessment cadence (annual, 2-year, 3-year)
+      - value: 4
+        label: Continuous monitoring with event-triggered re-assessments
+
+  - id: d5_q5
+    text: Have you assessed cross-border transfer impact (Quebec Law 25 s. 17)?
+    answer_type: single_select
+    weight: 0.15
+    regulatory_note: Law 25 s. 17 requires a documented transfer impact assessment before communicating personal information outside Quebec.
+    options:
+      - value: 0
+        label: Not assessed
+      - value: 1
+        label: Aware of requirement, not documented
+      - value: 2
+        label: Assessed for major cross-border transfers
+      - value: 3
+        label: Comprehensive TIAs for all out-of-Quebec transfers
+      - value: 4
+        label: Living TIA register with ongoing review
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Vendor privacy risk is uncontrolled
+    recommendation: >
+      Inventory all vendors handling personal data. Draft and deploy a standard
+      DPA template. Prioritize DPAs with your top 10 vendors within 90 days.
+      This is a top regulator focus area under Law 25.
+    regulatory_risk: Law 25 s. 17 non-compliance on cross-border transfers can trigger penalties; vendor breaches become your breaches.
+    typical_consulting_hours: 40
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Intake exists but DPAs are inconsistent and sub-processor visibility is low
+    recommendation: >
+      Standardize DPA usage across all vendors handling personal data. Build
+      a sub-processor register. Establish re-assessment cadence for top vendors.
+    typical_consulting_hours: 24
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Vendor management mature but not automated
+    recommendation: >
+      Consider third-party risk management tooling to automate assessments and
+      monitoring. Focus automation on the highest-risk vendor tier first.
+    typical_consulting_hours: 12
