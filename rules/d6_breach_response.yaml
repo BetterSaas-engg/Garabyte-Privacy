@@ -1,0 +1,150 @@
+dimension_id: d6
+dimension_name: Breach Response Readiness
+dimension_weight: 0.13
+description: >
+  Measures preparedness for a privacy breach — playbook existence, testing
+  via tabletop exercises, Mandatory Breach Notification compliance, and
+  cross-functional response team readiness.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "s. 10.1 — Mandatory Breach Notification"
+      - "Breach of Security Safeguards Regulations"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 3.5 — Confidentiality incidents"
+      - "s. 3.6 — Notification to CAI and affected individuals"
+  - regulation: GDPR
+    clauses:
+      - "Art. 33 — Notification to supervisory authority"
+      - "Art. 34 — Communication to data subject"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No playbook. Response would be improvised.
+  1:
+    label: Developing
+    description: Draft playbook. Not tested.
+  2:
+    label: Defined
+    description: Approved playbook. Annual tabletop exercise.
+  3:
+    label: Managed
+    description: Playbook tested quarterly. Cross-functional team drilled.
+  4:
+    label: Optimized
+    description: Automated detection feeding into playbook. Post-incident improvement loop.
+
+questions:
+  - id: d6_q1
+    text: Is there a documented breach response playbook?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Upload or link the current breach response playbook.
+    options:
+      - value: 0
+        label: No playbook
+      - value: 1
+        label: Informal notes, not a true playbook
+      - value: 2
+        label: Documented playbook with decision points
+      - value: 3
+        label: Comprehensive playbook with scenarios and role cards
+      - value: 4
+        label: Playbook integrated with detection tooling and auto-triggered workflows
+
+  - id: d6_q2
+    text: Has the playbook been tested via tabletop exercise in the last 12 months?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Never tested
+      - value: 1
+        label: Tested more than 2 years ago
+      - value: 2
+        label: Tested annually
+      - value: 3
+        label: Tested semi-annually with multiple scenarios
+      - value: 4
+        label: Quarterly exercises plus real incident debriefs
+
+  - id: d6_q3
+    text: Are notification timelines understood (72 hours GDPR, ASAP PIPEDA, ASAP Law 25)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Timelines not understood
+      - value: 1
+        label: Aware of timelines, no process to meet them
+      - value: 2
+        label: Process exists, untested under pressure
+      - value: 3
+        label: Tested process consistently meets timelines
+      - value: 4
+        label: Automated notification drafting to accelerate regulatory reporting
+
+  - id: d6_q4
+    text: Do you maintain a breach register for internal tracking (required under Law 25)?
+    answer_type: single_select
+    weight: 0.20
+    regulatory_note: Law 25 s. 3.8 requires a record of all confidentiality incidents, not just reportable ones.
+    options:
+      - value: 0
+        label: No register
+      - value: 1
+        label: Informal record of major incidents
+      - value: 2
+        label: Register for all reportable incidents
+      - value: 3
+        label: Register for all incidents regardless of severity, per Law 25
+      - value: 4
+        label: Register with trend analysis driving preventive controls
+
+  - id: d6_q5
+    text: Is there a defined cross-functional breach response team (Legal, IT, Comms, Privacy)?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No defined team
+      - value: 1
+        label: Team identified but not drilled
+      - value: 2
+        label: Team identified, roles documented
+      - value: 3
+        label: Team drilled regularly, backup owners named
+      - value: 4
+        label: 24/7 on-call rotation with external counsel on retainer
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Organization is not prepared for a breach — high financial and regulatory exposure
+    recommendation: >
+      Draft and approve a breach response playbook within 60 days. Identify
+      cross-functional response team. Run a baseline tabletop exercise.
+      The cost of a poorly-handled breach massively exceeds the cost of
+      preparation.
+    regulatory_risk: PIPEDA and Law 25 mandatory breach notification failures can trigger regulator investigations and civil liability.
+    typical_consulting_hours: 36
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Playbook exists but untested — unproven under pressure
+    recommendation: >
+      Run a tabletop exercise within 90 days. Test the notification timeline
+      workflow end-to-end. Build a breach register aligned with Law 25 s. 3.8
+      requirements.
+    typical_consulting_hours: 16
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Response capability solid but not continuously improved
+    recommendation: >
+      Increase exercise frequency to quarterly. Integrate incident learnings
+      back into the playbook. Consider automated detection feeding the response workflow.
+    typical_consulting_hours: 8
