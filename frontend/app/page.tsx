@@ -1,101 +1,112 @@
-import Image from "next/image";
+/**
+ * Temporary homepage — system check.
+ * Confirms Tailwind/Garabyte theme loaded and the API is reachable.
+ * Will be replaced with the real tenant picker in the next step.
+ */
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { getHealth, getTenants } from "@/lib/api";
+import type { HealthResponse, Tenant } from "@/lib/types";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [tenants, setTenants] = useState<Tenant[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  useEffect(() => {
+    Promise.all([getHealth(), getTenants()])
+      .then(([h, t]) => {
+        setHealth(h);
+        setTenants(t);
+      })
+      .catch((e) => setError(e.message));
+  }, []);
+
+  return (
+    <main className="min-h-screen bg-garabyte-cream-50 px-6 py-16">
+      <div className="max-w-3xl mx-auto">
+        <header className="mb-12">
+          <p className="text-sm uppercase tracking-wider text-garabyte-primary-500 mb-2">
+            Garabyte Privacy Health Check
+          </p>
+          <h1 className="text-display text-garabyte-primary-800">
+            System check
+          </h1>
+          <p className="mt-4 text-garabyte-ink-700 text-lg leading-relaxed">
+            Temporary verification page. Confirms the Garabyte theme is loaded
+            and the frontend can reach the backend API. Replace me with the
+            real landing page.
+          </p>
+        </header>
+
+        {error && (
+          <div className="mb-8 p-4 rounded-xl bg-garabyte-status-critical/10 border border-garabyte-status-critical/20">
+            <p className="text-garabyte-status-critical font-medium">
+              API error: {error}
+            </p>
+            <p className="text-sm text-garabyte-ink-500 mt-1">
+              Make sure the backend is running on http://localhost:8001
+            </p>
+          </div>
+        )}
+
+        <section className="mb-8 p-6 rounded-xl bg-white shadow-card">
+          <h2 className="text-h3 text-garabyte-primary-800 mb-4">
+            Backend health
+          </h2>
+          {health ? (
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <dt className="text-garabyte-ink-500">Status</dt>
+              <dd className="font-medium text-garabyte-status-good">
+                {health.status}
+              </dd>
+              <dt className="text-garabyte-ink-500">Environment</dt>
+              <dd className="font-medium">{health.environment}</dd>
+              <dt className="text-garabyte-ink-500">Dimensions loaded</dt>
+              <dd className="font-medium">{health.dimensions_loaded}</dd>
+              <dt className="text-garabyte-ink-500">Total questions</dt>
+              <dd className="font-medium">{health.total_questions}</dd>
+            </dl>
+          ) : !error ? (
+            <p className="text-garabyte-ink-500">Loading…</p>
+          ) : null}
+        </section>
+
+        <section className="p-6 rounded-xl bg-white shadow-card">
+          <h2 className="text-h3 text-garabyte-primary-800 mb-4">
+            Demo tenants
+          </h2>
+          {tenants ? (
+            <ul className="divide-y divide-garabyte-ink-100">
+              {tenants.map((t) => (
+                <li key={t.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-garabyte-primary-800">
+                      {t.name}
+                    </p>
+                    <p className="text-sm text-garabyte-ink-500">
+                      {t.sector} · {t.jurisdiction}
+                      {t.employee_count && ` · ${t.employee_count} employees`}
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-wider text-garabyte-primary-500 bg-garabyte-primary-50 px-3 py-1 rounded-full">
+                    {t.slug}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : !error ? (
+            <p className="text-garabyte-ink-500">Loading…</p>
+          ) : null}
+        </section>
+
+        <footer className="mt-12 text-center text-sm text-garabyte-ink-500">
+          If you see this styled page with 3 tenants listed, the frontend
+          foundation is working.
+        </footer>
+      </div>
+    </main>
   );
 }

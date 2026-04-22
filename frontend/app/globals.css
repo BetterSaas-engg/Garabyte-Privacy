@@ -2,26 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Load Inter from Google Fonts — free, universally available */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    font-family: theme('fontFamily.sans');
+    color: theme('colors.garabyte.ink.900');
+    background-color: theme('colors.garabyte.cream.50');
   }
-}
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  h1, h2, h3, h4, h5, h6 {
+    color: theme('colors.garabyte.primary.800');
+    font-weight: 600;
+  }
+
+  /* Subtle default link style — not flashy */
+  a {
+    color: theme('colors.garabyte.primary.600');
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+
+  a:hover {
+    color: theme('colors.garabyte.primary.500');
   }
 }
