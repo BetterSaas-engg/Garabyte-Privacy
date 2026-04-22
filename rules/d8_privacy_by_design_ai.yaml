@@ -1,0 +1,160 @@
+dimension_id: d8
+dimension_name: Privacy by Design & AI Governance
+dimension_weight: 0.11
+description: >
+  Measures whether privacy and AI-specific risks are assessed before systems
+  go live. PIAs (Privacy Impact Assessments), AI impact assessments, privacy
+  requirements in product development lifecycle, and AI system inventory with
+  risk classification.
+
+  Note: This dimension is the strategic bridge to a future PIA automation
+  product. Low scores here indicate strong fit for dedicated PIA tooling.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 7 — Safeguards (applies at design stage)"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 3.3 — PIA required for high-risk projects"
+  - regulation: GDPR
+    clauses:
+      - "Art. 25 — Data protection by design and by default"
+      - "Art. 35 — Data Protection Impact Assessment (DPIA)"
+  - regulation: Canada AIDA (proposed)
+    clauses:
+      - "Impact assessment required for high-impact AI systems"
+  - regulation: ISO 42001
+    clauses:
+      - "AI management system requirements"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No PIAs. No AI governance.
+  1:
+    label: Developing
+    description: Occasional PIAs for major projects. AI governance informal.
+  2:
+    label: Defined
+    description: PIA triggered by defined criteria. AI systems tracked informally.
+  3:
+    label: Managed
+    description: PIAs routine and tracked. AI impact assessments for AI systems. Register of AI systems with risk tiers.
+  4:
+    label: Optimized
+    description: PIAs embedded in SDLC with automated tooling. Continuous AI risk monitoring.
+
+questions:
+  - id: d8_q1
+    text: Are Privacy Impact Assessments (PIAs) conducted for new projects handling personal data?
+    answer_type: single_select
+    weight: 0.25
+    evidence_prompt: Upload a sample completed PIA (redacted if needed).
+    options:
+      - value: 0
+        label: PIAs are not conducted
+      - value: 1
+        label: PIAs for some major projects
+      - value: 2
+        label: PIAs for projects meeting defined criteria
+      - value: 3
+        label: PIAs for all relevant projects, reviewed by privacy team
+      - value: 4
+        label: PIAs embedded in SDLC with tooling and automated triggers
+
+  - id: d8_q2
+    text: Is there a defined trigger that mandates a PIA (new vendor, AI use, sensitive data, cross-border)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: No PIA trigger defined
+      - value: 1
+        label: Informal practice, case by case
+      - value: 2
+        label: Documented trigger criteria
+      - value: 3
+        label: Clear trigger criteria with mandatory enforcement
+      - value: 4
+        label: Automated trigger based on project intake metadata
+
+  - id: d8_q3
+    text: Are AI systems assessed for privacy and algorithmic risk before deployment?
+    answer_type: single_select
+    weight: 0.20
+    regulatory_note: Canada's proposed AIDA would mandate impact assessments for high-impact AI systems. Law 25 s. 12.1 introduces AI-related transparency obligations.
+    options:
+      - value: 0
+        label: No AI assessment
+      - value: 1
+        label: Ad hoc review of some AI systems
+      - value: 2
+        label: Privacy-only assessment for AI systems
+      - value: 3
+        label: Joint privacy and algorithmic risk assessment for all AI systems
+      - value: 4
+        label: Comprehensive AI impact assessment aligned with ISO 42001 and AIDA
+
+  - id: d8_q4
+    text: Are privacy requirements embedded in the software development lifecycle?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Privacy considered only after launch
+      - value: 1
+        label: Privacy review at end of development
+      - value: 2
+        label: Privacy requirements defined at project kickoff
+      - value: 3
+        label: Privacy requirements tracked through SDLC with gates
+      - value: 4
+        label: Privacy built into developer tooling and automated checks
+
+  - id: d8_q5
+    text: Is there a register of all AI systems in use, with risk classification?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: No AI register
+      - value: 1
+        label: Informal list of known AI systems
+      - value: 2
+        label: Register of production AI systems
+      - value: 3
+        label: Register of all AI systems including pilots, with risk tiers
+      - value: 4
+        label: Living register integrated with procurement and deployment workflows
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Privacy and AI risks are not assessed proactively — Law 25 s. 3.3 non-compliance likely
+    recommendation: >
+      Establish a PIA process and trigger criteria within 90 days. Build a
+      baseline inventory of AI systems with risk classification. This is a
+      rapidly intensifying regulator focus area with both Law 25 and AIDA.
+    regulatory_risk: Law 25 s. 3.3 requires PIAs for high-risk projects; non-compliance is structural and highly visible.
+    typical_consulting_hours: 48
+    upsell_hook: Natural fit for dedicated PIA automation platform — the organization would benefit from purpose-built tooling.
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: PIAs conducted but inconsistently; AI systems not formally assessed
+    recommendation: >
+      Formalize PIA trigger criteria and enforce them. Build an AI system
+      register with risk tiers. Add AI-specific assessment criteria (bias,
+      explainability, data provenance) to existing PIA process.
+    typical_consulting_hours: 30
+    upsell_hook: PIA automation would reduce effort per assessment by 60-70%.
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: PIA program mature but not yet embedded in SDLC
+    recommendation: >
+      Shift PIAs left in the development lifecycle. Embed privacy requirements
+      in project intake so they are addressed before design decisions are made.
+    typical_consulting_hours: 16
+    upsell_hook: Automated PIA tooling integrates well with SDLC shifts.
