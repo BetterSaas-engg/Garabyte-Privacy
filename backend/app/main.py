@@ -22,7 +22,10 @@ from .routes import tenants as tenants_routes
 from .routes import assessments as assessments_routes
 
 
-RULES_DIR = Path(__file__).parent.parent.parent / "rules"
+# Resolve rules directory — works in both local dev and Docker container
+_LOCAL_RULES = Path(__file__).parent.parent.parent / "rules"
+_DOCKER_RULES = Path(__file__).parent.parent / "rules"
+RULES_DIR = _LOCAL_RULES if _LOCAL_RULES.exists() else _DOCKER_RULES
 RULES = load_rules_library(RULES_DIR)
 
 
