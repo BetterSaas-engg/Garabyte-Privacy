@@ -6,7 +6,7 @@ import type { Tenant, TenantHistoryItem } from "@/lib/types";
 
 interface TenantCardProps {
   tenant: Tenant;
-  history: TenantHistoryItem[];   // sorted oldest -> newest
+  history: TenantHistoryItem[];
 }
 
 function formatTimeAgo(dateStr: string | null): string {
@@ -21,7 +21,6 @@ function formatTimeAgo(dateStr: string | null): string {
 }
 
 function sectorLabel(sector: string): string {
-  // Capitalize first letter
   return sector.charAt(0).toUpperCase() + sector.slice(1);
 }
 
@@ -39,17 +38,19 @@ export function TenantCard({ tenant, history }: TenantCardProps) {
   return (
     <Link
       href={`/tenants/${tenant.slug}`}
-      className="block bg-white rounded-xl shadow-card hover:shadow-lifted transition-all duration-200 hover:-translate-y-0.5"
+      className="group block bg-white rounded-xl shadow-card hover:shadow-lifted transition-all duration-200 hover:-translate-y-0.5 h-full"
     >
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-4 mb-1">
+      <div className="p-6 flex flex-col h-full">
+        {/* Name row — fixed min-height so cards align */}
+        <div className="flex items-start justify-between gap-3 mb-1 min-h-[3.5rem]">
           <h3 className="text-h3 text-garabyte-primary-800 leading-tight">
             {tenant.name}
           </h3>
-          <span className="text-garabyte-primary-400 group-hover:text-garabyte-primary-600 text-lg">
+          <span className="text-garabyte-primary-300 group-hover:text-garabyte-primary-600 text-lg shrink-0 transition-colors">
             →
           </span>
         </div>
+
         <p className="text-sm text-garabyte-ink-500 mb-5">
           {sectorLabel(tenant.sector)} · {tenant.jurisdiction}
           {tenant.employee_count && ` · ${tenant.employee_count.toLocaleString()} employees`}
@@ -68,18 +69,18 @@ export function TenantCard({ tenant, history }: TenantCardProps) {
             </div>
             <p className="text-sm text-garabyte-ink-700">
               {maturity} maturity
-              {delta !== null && delta > 0 && (
-                <span className="text-garabyte-status-good ml-2">
-                  · improved +{delta.toFixed(2)} this quarter
-                </span>
-              )}
-              {delta !== null && delta < 0 && (
-                <span className="text-garabyte-status-critical ml-2">
-                  · down {delta.toFixed(2)} this quarter
-                </span>
-              )}
             </p>
-            <p className="text-xs text-garabyte-ink-500 mt-4">
+            {delta !== null && delta > 0 && (
+              <p className="text-sm text-garabyte-status-good mt-1">
+                Improved +{delta.toFixed(2)} this quarter
+              </p>
+            )}
+            {delta !== null && delta < 0 && (
+              <p className="text-sm text-garabyte-status-critical mt-1">
+                Down {delta.toFixed(2)} this quarter
+              </p>
+            )}
+            <p className="text-xs text-garabyte-ink-500 mt-auto pt-4">
               Last assessed {formatTimeAgo(latest.completed_at)}
             </p>
           </>

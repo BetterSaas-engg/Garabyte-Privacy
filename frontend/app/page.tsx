@@ -18,7 +18,6 @@ export default function Home() {
     async function load() {
       try {
         const tenants = await getTenants();
-        // Fetch history for each tenant in parallel
         const withHistory = await Promise.all(
           tenants.map(async (t) => ({
             tenant: t,
@@ -34,18 +33,17 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-[calc(100vh-73px)] px-6 py-16">
+    <main className="min-h-[calc(100vh-73px)] px-6 py-12">
       <div className="max-w-5xl mx-auto">
-        <section className="mb-16 max-w-2xl">
-          <p className="text-sm uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium mb-3">
+        <section className="mb-12 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium mb-3">
             Privacy program assessment
           </p>
-          <h1 className="text-display text-garabyte-primary-800 mb-6">
+          <h1 className="text-h1 text-garabyte-primary-800 mb-5 leading-tight">
             Know where your privacy program stands.
-            <br />
             Know where to go next.
           </h1>
-          <p className="text-lg text-garabyte-ink-700 leading-relaxed">
+          <p className="text-base text-garabyte-ink-700 leading-relaxed max-w-2xl">
             An 8-dimension maturity assessment mapped to PIPEDA, Quebec Law 25,
             CASL, GDPR, and emerging AI governance standards. Co-designed with
             Garabyte Consulting.
@@ -53,9 +51,9 @@ export default function Home() {
         </section>
 
         <section>
-          <div className="flex items-baseline justify-between mb-6">
+          <div className="flex items-baseline justify-between mb-5">
             <h2 className="text-h2 text-garabyte-primary-800">
-              Your organizations
+              Client organizations
             </h2>
             <p className="text-sm text-garabyte-ink-500">
               {data ? `${data.length} active` : ""}
@@ -78,7 +76,7 @@ export default function Home() {
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-xl shadow-card p-6 animate-pulse h-56"
+                  className="bg-white rounded-xl shadow-card p-6 animate-pulse h-60"
                 >
                   <div className="h-5 bg-garabyte-ink-100 rounded w-2/3 mb-3" />
                   <div className="h-3 bg-garabyte-ink-100 rounded w-1/2 mb-8" />
