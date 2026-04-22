@@ -1,15 +1,12 @@
 """
 FastAPI application entry point.
 
-For step 8a, this only has /health and /. We'll add the real endpoints
-in step 8b by mounting route modules from app/routes/.
-
 Run locally with:
-    uvicorn app.main:app --reload --port 8000
+    uvicorn app.main:app --reload --port 8001
 
-Then visit:
-    http://localhost:8000/health  -> JSON health check
-    http://localhost:8000/docs    -> interactive API docs
+Visit:
+    http://localhost:8001/health  -> health check
+    http://localhost:8001/docs    -> interactive API docs
 """
 
 from pathlib import Path
@@ -20,10 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import init_db
 from .services.rules_loader import load_rules_library
+from .routes import rules as rules_routes
+from .routes import tenants as tenants_routes
+from .routes import assessments as assessments_routes
 
 
-# Load the rules library once at startup. If the YAML is malformed or
-# weights don't sum to 1.0, the app refuses to start. Crash early.
 RULES_DIR = Path(__file__).parent.parent.parent / "rules"
 RULES = load_rules_library(RULES_DIR)
 
@@ -38,8 +36,6 @@ app = FastAPI(
 )
 
 
-# CORS -- allow the frontend (on a different origin) to call the API.
-# Origins list comes from config; production deploys lock this down.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -51,13 +47,11 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup() -> None:
-    """Initialize database tables on app startup."""
     init_db()
 
 
-@app.get("/")
+@app.get("/", tags=["meta"])
 def root() -> dict:
-    """Tiny landing page pointing at the docs."""
     return {
         "service": "garabyte-health-check",
         "docs_url": "/docs",
@@ -65,13 +59,8 @@ def root() -> dict:
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["meta"])
 def health() -> dict:
-    """
-    Health check -- used by Railway and monitoring to verify the service is up.
-    Also reports how much of the rules library loaded, which catches YAML
-    drift early.
-    """
     return {
         "status": "ok",
         "version": "0.1.0",
@@ -79,3 +68,12 @@ def health() -> dict:
         "dimensions_loaded": len(RULES.dimensions),
         "total_questions": sum(len(d.questions) for d in RULES.dimensions),
     }
+
+
+# Mount the route modules. Note assessments has TWO routers because
+# creation lives under /tenants/{id}/assessments while lifecycle lives
+# under /assessments/{id}.
+app.include_router(rules_routes.router)
+app.include_router(tenants_routes.router)
+app.include_router(assessments_routes.tenants_router)
+app.include_router(assessments_routes.assessments_router)
