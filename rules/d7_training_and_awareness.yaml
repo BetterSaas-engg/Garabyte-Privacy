@@ -1,0 +1,145 @@
+dimension_id: d7
+dimension_name: Training & Awareness
+dimension_weight: 0.10
+description: >
+  Measures whether employees understand their privacy obligations. Coverage,
+  frequency, role-based specialization, completion tracking, and content
+  freshness when regulations change.
+
+regulatory_anchors:
+  - regulation: PIPEDA
+    clauses:
+      - "Principle 1 — Accountability (staff training required)"
+  - regulation: Quebec Law 25
+    clauses:
+      - "s. 3.2 — Governance policies must be communicated to staff"
+  - regulation: GDPR
+    clauses:
+      - "Art. 39 — DPO tasks include staff training"
+
+maturity_levels:
+  0:
+    label: Ad hoc
+    description: No privacy training.
+  1:
+    label: Developing
+    description: Training for some employees, no tracking.
+  2:
+    label: Defined
+    description: Mandatory training at onboarding, refreshed annually, completion tracked.
+  3:
+    label: Managed
+    description: Role-specific modules, completion reported to leadership, updated on regulation changes.
+  4:
+    label: Optimized
+    description: Continuous micro-learning, phishing/privacy simulations, measurable behavior change.
+
+questions:
+  - id: d7_q1
+    text: Is privacy training mandatory for all employees?
+    answer_type: single_select
+    weight: 0.25
+    options:
+      - value: 0
+        label: No mandatory training
+      - value: 1
+        label: Mandatory for some roles only
+      - value: 2
+        label: Mandatory for all employees at onboarding
+      - value: 3
+        label: Mandatory at onboarding plus annual refresh
+      - value: 4
+        label: Mandatory with continuous micro-learning throughout the year
+
+  - id: d7_q2
+    text: Is training delivered at onboarding and refreshed annually?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Neither onboarding nor refresh
+      - value: 1
+        label: Onboarding only, no refresh
+      - value: 2
+        label: Onboarding plus ad hoc refresh
+      - value: 3
+        label: Onboarding plus annual refresh with testing
+      - value: 4
+        label: Onboarding plus quarterly micro-refresh plus annual deep training
+
+  - id: d7_q3
+    text: Are there role-specific modules (for developers, marketers, HR, customer service)?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Generic training only
+      - value: 1
+        label: Some role-specific content
+      - value: 2
+        label: Role-specific modules for 2-3 high-risk roles
+      - value: 3
+        label: Role-specific modules across major functions
+      - value: 4
+        label: Highly tailored modules including developer security-by-design
+
+  - id: d7_q4
+    text: Is completion tracked and reported to leadership?
+    answer_type: single_select
+    weight: 0.20
+    options:
+      - value: 0
+        label: Not tracked
+      - value: 1
+        label: Tracked but not reported
+      - value: 2
+        label: Tracked and reported annually
+      - value: 3
+        label: Tracked, reported quarterly, completion is a performance metric
+      - value: 4
+        label: Real-time dashboard with escalation for overdue training
+
+  - id: d7_q5
+    text: Is training content updated when regulations change?
+    answer_type: single_select
+    weight: 0.15
+    options:
+      - value: 0
+        label: Content is static
+      - value: 1
+        label: Updated every few years
+      - value: 2
+        label: Updated when major regulation changes occur
+      - value: 3
+        label: Reviewed annually with targeted regulatory updates
+      - value: 4
+        label: Continuously updated with dedicated content owner
+
+gap_remediation_library:
+  - trigger_condition: "avg_score < 1.5"
+    severity: critical
+    finding: Workforce is not trained on privacy obligations
+    recommendation: >
+      Launch mandatory baseline privacy training within 90 days. This is
+      foundational to accountability under PIPEDA Principle 1 and Law 25
+      s. 3.2. A trained workforce is the single best defense against most
+      privacy incidents.
+    typical_consulting_hours: 40
+
+  - trigger_condition: "1.5 <= avg_score < 2.5"
+    severity: high
+    finding: Training exists but coverage and tracking are weak
+    recommendation: >
+      Make training mandatory for all employees with annual refresh. Implement
+      completion tracking with escalation for overdue training. Build
+      role-specific modules for your top 3 high-risk functions.
+    typical_consulting_hours: 16
+
+  - trigger_condition: "2.5 <= avg_score < 3.5"
+    severity: moderate
+    finding: Training program mature but not behavior-driven
+    recommendation: >
+      Move from completion metrics to behavior metrics. Introduce privacy
+      simulations (mock DSARs, breach exercises). Measure actual reduction in
+      privacy incidents as the outcome metric.
+    typical_consulting_hours: 8
