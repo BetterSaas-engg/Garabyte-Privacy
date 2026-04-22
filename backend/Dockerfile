@@ -1,4 +1,5 @@
 # Backend Dockerfile for Railway deployment
+# Build context: project root (set by railway.toml)
 # Uses Python 3.12 (stable, well-supported)
 
 FROM python:3.12-slim
@@ -12,14 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements first for Docker layer caching
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the backend
-COPY app/ ./app/
+# Copy the backend application code
+COPY backend/app/ ./app/
 
-# Copy the rules library from the parent directory
-# Railway runs the build with the project root as context (configured in railway.toml)
+# Copy the rules library from the project root
 COPY rules/ ./rules/
 
 # Railway provides PORT env var; default to 8000 if not set
@@ -27,4 +27,4 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Start uvicorn, binding to 0.0.0.0 so the container accepts external traffic
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
