@@ -1,5 +1,5 @@
 """
-Smoke test for the rules loader. Not a unit test — a tracer bullet that
+Smoke test for the rules loader. Not a unit test -- a tracer bullet that
 exercises the whole path from YAML files on disk to validated dataclasses.
 
 Run from the backend/ directory:
@@ -21,8 +21,8 @@ def main():
 
     lib = load_rules_library(rules_dir)
 
-    print(f"\n✓ Loaded {len(lib.dimensions)} dimensions")
-    print(f"✓ Total questions: {sum(len(d.questions) for d in lib.dimensions)}")
+    print(f"\n[OK] Loaded {len(lib.dimensions)} dimensions")
+    print(f"[OK] Total questions: {sum(len(d.questions) for d in lib.dimensions)}")
 
     print("\nDimension summary:")
     print(f"  {'ID':4} {'Weight':>8}  {'Qs':>3}  {'Regs':>4}  Name")
@@ -38,7 +38,7 @@ def main():
 
     # Test the by_id lookup
     d1 = lib.by_id("d1")
-    print(f"\n✓ Lookup by id works: lib.by_id('d1') → {d1.name}")
+    print(f"\n[OK] Lookup by id works: lib.by_id('d1') -> {d1.name}")
 
     # Dump one full dimension to show everything parsed correctly
     print(f"\n--- Full parsed detail for {d1.id} ({d1.name}) ---")
@@ -55,7 +55,7 @@ def main():
     print(f"  Weight: {q1.weight}, Options: {len(q1.options)}")
     print(f"Gap remediation entries: {len(d1.gap_remediation_library)}")
 
-    print("\n✓ All checks passed. Rules loader works end-to-end.")
+    print("\n[OK] All checks passed. Rules loader works end-to-end.")
 
 
 if __name__ == "__main__":
