@@ -30,7 +30,7 @@ export function AssessmentHistory({ history }: AssessmentHistoryProps) {
   return (
     <div className="bg-white rounded-xl shadow-soft overflow-hidden">
       <div className="divide-y divide-garabyte-ink-100">
-        {sorted.map((h, i) => (
+        {sorted.map((h) => (
           <div
             key={h.assessment_id}
             className="flex items-center justify-between gap-4 px-6 py-4"

@@ -3,7 +3,6 @@
 import { ScoreDots } from "./ScoreDots";
 
 interface ScoreSummaryProps {
-  tenantName: string;
   assessmentLabel: string | null;
   overallScore: number;
   maturityLabel: string;
@@ -11,7 +10,6 @@ interface ScoreSummaryProps {
 }
 
 export function ScoreSummary({
-  tenantName,
   assessmentLabel,
   overallScore,
   maturityLabel,

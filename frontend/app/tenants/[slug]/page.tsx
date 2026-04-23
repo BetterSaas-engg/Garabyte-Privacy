@@ -120,7 +120,6 @@ export default function TenantDashboard({
 
         {/* Section 1: score summary */}
         <ScoreSummary
-          tenantName={tenant.name}
           assessmentLabel={latestResult.assessment.label}
           overallScore={latestResult.result.overall_score}
           maturityLabel={latestResult.result.overall_maturity_label}
