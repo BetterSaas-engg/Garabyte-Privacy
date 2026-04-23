@@ -37,6 +37,7 @@ export default function TenantDashboard({
           getTenantHistory(slug),
         ]);
         setTenant(t);
+        document.title = `${t.name} — Garabyte Privacy Health Check`;
         setHistory(h);
 
         // Fetch the latest completed assessment's full result

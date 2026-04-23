@@ -3,8 +3,22 @@ import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "Garabyte Privacy Health Check",
-  description: "Privacy program maturity assessment, co-designed with Garabyte Consulting",
+  title: {
+    default: "Garabyte Privacy Health Check",
+    template: "%s — Garabyte Privacy Health Check",
+  },
+  description:
+    "Privacy program maturity assessment co-designed with Garabyte Consulting. Eight dimensions mapped to PIPEDA, Quebec Law 25, CASL, GDPR, and emerging AI governance standards.",
+  openGraph: {
+    title: "Garabyte Privacy Health Check",
+    description:
+      "Know where your privacy program stands. Know where to go next. Co-designed with Garabyte Consulting.",
+    type: "website",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({
