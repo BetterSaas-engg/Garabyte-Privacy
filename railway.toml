@@ -1,12 +1,13 @@
 # Railway config — tells Railway to build from the backend/ subdirectory
 # but include the rules/ folder from the project root.
+# Note: startCommand is intentionally omitted so the Dockerfile CMD takes effect.
+# The Dockerfile CMD wraps uvicorn in sh -c to allow $PORT expansion.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
