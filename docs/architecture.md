@@ -209,9 +209,17 @@ Schema migrations are **not** auto-run on container start. Run `alembic upgrade 
 
 Vercel auto-detects Next.js. Set `NEXT_PUBLIC_API_URL` to the Railway backend URL in the Vercel project settings. No Dockerfile or vercel.json needed.
 
+## Consultant console (static UI mock)
+
+A static UI mock of the consultant-side surfaces lives at `/consultant`. Seven screens (home, overview, findings review, raw responses, evidence, publish, history) stacked on a single review canvas. **All data is hardcoded in [frontend/lib/consultant-mock.ts](../frontend/lib/consultant-mock.ts) — there is no backend wiring yet.** The console renders cleanly and is interactive (filter chips, severity selectors, expand/collapse, bulk-approve, etc.) but persists nothing.
+
+It's deliberately built behind a Next.js route group split: `app/(site)/` for customer-facing pages (uses `SiteHeader` / `SiteFooter`), `app/consultant/` outside the group (its own chrome via `CanvasHeader`). URLs unchanged. Backend wiring follows audit Phase 3 (auth + ownership) and Phase 5 (findings as first-class table, consultant override layer, audit log).
+
+The console design assumes the auth and authorization model defined in [docs/roles-and-permissions.md](roles-and-permissions.md). That document is the canonical spec for Phase 3 — it predates this implementation but the conditions C1–C22 it defines are what every route guard, query filter, and ownership check has to satisfy.
+
 ## What's intentionally not here
 
-- **No authentication** (audit C1). All endpoints are public. Do not deploy to a customer-facing URL until this is built.
+- **No authentication** (audit C1). All endpoints are public. Do not deploy to a customer-facing URL until this is built. The auth model is specified in [docs/roles-and-permissions.md](roles-and-permissions.md); implementation is Phase 3 work.
 - **No tests in pytest format** — the four `test_*.py` files are bare scripts that print `[OK]`/`[FAIL]`. CI catches `[FAIL]` via grep until they're converted (audit M12).
 - **No structured logging.** The audit tracks this as M13.
 - **No analytics, tracking, or telemetry.** This is intentional — see `docs/privacy.md`.
