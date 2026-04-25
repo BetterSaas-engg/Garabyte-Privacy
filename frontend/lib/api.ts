@@ -32,6 +32,10 @@ async function apiRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
+    // credentials:"include" sends the gp_session httpOnly cookie cross-origin.
+    // Required because the frontend (Vercel) and backend (Railway) live on
+    // different domains in production.
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
@@ -46,10 +50,25 @@ async function apiRequest<T>(
     } catch {
       // response had no JSON body; keep statusText
     }
-    throw new Error(`API ${response.status}: ${detail}`);
+    const err = new Error(`API ${response.status}: ${detail}`) as ApiError;
+    err.status = response.status;
+    throw err;
   }
 
+  // 204 No Content (logout) — return undefined; callers shouldn't read .json()
+  if (response.status === 204) {
+    return undefined as unknown as T;
+  }
   return response.json() as Promise<T>;
+}
+
+// Error type carrying the HTTP status, so callers can react to 401 etc.
+export interface ApiError extends Error {
+  status?: number;
+}
+
+export function isUnauthorized(err: unknown): boolean {
+  return err instanceof Error && (err as ApiError).status === 401;
 }
 
 // ---- Health ----
@@ -129,4 +148,109 @@ export function getAssessmentResult(
   return apiRequest<AssessmentResultOut>(
     `/assessments/${assessmentId}/result`,
   );
+}
+
+// ---- Auth ----
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string | null;
+  email_verified: boolean;
+  created_at: string;
+}
+
+export interface AuthMembership {
+  org_id: number;
+  org_slug: string;
+  org_name: string;
+  role: string;
+  dimension_ids: string[] | null;
+}
+
+export interface WhoAmI {
+  user: AuthUser;
+  memberships: AuthMembership[];
+}
+
+export interface InvitationPreview {
+  email: string;
+  org_name: string;
+  org_slug: string;
+  role: string;
+  dimension_ids: string[] | null;
+}
+
+export function signup(payload: { email: string; password: string; name?: string }) {
+  return apiRequest<{ email: string; message: string }>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function verifyEmail(token: string) {
+  return apiRequest<AuthUser>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function login(payload: { email: string; password: string }) {
+  return apiRequest<AuthUser>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function logout(): Promise<void> {
+  return apiRequest<void>("/auth/logout", { method: "POST" });
+}
+
+export function whoami(): Promise<WhoAmI> {
+  return apiRequest<WhoAmI>("/auth/me");
+}
+
+export function magicRequest(email: string) {
+  return apiRequest<{ message: string }>("/auth/magic/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function magicConsume(token: string) {
+  return apiRequest<AuthUser>("/auth/magic/consume", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function passwordResetRequest(email: string) {
+  return apiRequest<{ message: string }>("/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function passwordResetConfirm(token: string, newPassword: string) {
+  return apiRequest<AuthUser>("/auth/password-reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+}
+
+export function previewInvitation(token: string) {
+  return apiRequest<InvitationPreview>(
+    `/auth/invitations/preview?token=${encodeURIComponent(token)}`,
+  );
+}
+
+export function acceptInvitation(payload: {
+  token: string;
+  name?: string;
+  password?: string;
+}) {
+  return apiRequest<AuthUser>("/auth/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

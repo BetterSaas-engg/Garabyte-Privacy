@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getTenants, getTenantHistory } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { getTenants, getTenantHistory, isUnauthorized } from "@/lib/api";
 import type { Tenant, TenantHistoryItem } from "@/lib/types";
 import { TenantCard } from "@/components/TenantCard";
 
@@ -11,6 +12,7 @@ interface TenantWithHistory {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [data, setData] = useState<TenantWithHistory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +28,15 @@ export default function Home() {
         );
         setData(withHistory);
       } catch (e) {
+        if (isUnauthorized(e)) {
+          router.replace("/auth/login");
+          return;
+        }
         setError(e instanceof Error ? e.message : String(e));
       }
     }
     load();
-  }, []);
+  }, [router]);
 
   return (
     <main className="min-h-[calc(100vh-73px)] px-6 py-12">

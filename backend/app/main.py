@@ -13,7 +13,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
+from .auth.rate import limiter
 from .config import settings
 from .database import init_db
 from .services.rules_loader import load_rules_library
@@ -38,6 +42,14 @@ app = FastAPI(
         "Built in partnership with Garabyte Consulting."
     ),
 )
+
+
+# Hook the rate limiter into the app: store on state for per-route decorators
+# to find, register the 429 handler, and add the middleware that enforces
+# default_limits on every request.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 app.add_middleware(

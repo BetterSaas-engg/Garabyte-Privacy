@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Default covers local Next.js dev server
     cors_allowed_origins: str = "http://localhost:3000"
 
+    # Base URL the frontend is served from. Used to build absolute links in
+    # the email bodies for verification, magic-link, password-reset, and
+    # invitation flows. In production, set FRONTEND_BASE_URL via env.
+    frontend_base_url: str = "http://localhost:3000"
+
     # DATABASE_URL is read directly by app/database.py, not here.
 
     @property

@@ -6,7 +6,9 @@ import {
   getTenant,
   getTenantHistory,
   getAssessmentResult,
+  isUnauthorized,
 } from "@/lib/api";
+import { useRouter } from "next/navigation";
 import type {
   Tenant,
   TenantHistoryItem,
@@ -28,6 +30,7 @@ export default function TenantDashboard({
   const [history, setHistory] = useState<TenantHistoryItem[] | null>(null);
   const [latestResult, setLatestResult] = useState<AssessmentResultOut | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     async function load() {
@@ -47,11 +50,15 @@ export default function TenantDashboard({
           setLatestResult(result);
         }
       } catch (e) {
+        if (isUnauthorized(e)) {
+          router.replace("/auth/login");
+          return;
+        }
         setError(e instanceof Error ? e.message : String(e));
       }
     }
     load();
-  }, [slug]);
+  }, [slug, router]);
 
   if (error) {
     return (
