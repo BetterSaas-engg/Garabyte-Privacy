@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import init_db
 from .services.rules_loader import load_rules_library
+from .auth import routes as auth_routes
 from .routes import rules as rules_routes
 from .routes import tenants as tenants_routes
 from .routes import assessments as assessments_routes
@@ -76,6 +77,7 @@ def health() -> dict:
 # Mount the route modules. Note assessments has TWO routers because
 # creation lives under /tenants/{id}/assessments while lifecycle lives
 # under /assessments/{id}.
+app.include_router(auth_routes.router)
 app.include_router(rules_routes.router)
 app.include_router(tenants_routes.router)
 app.include_router(assessments_routes.tenants_router)

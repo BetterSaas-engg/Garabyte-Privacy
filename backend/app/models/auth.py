@@ -190,7 +190,13 @@ class AccessLog(Base):
         Index("ix_access_log_org_at", "org_id", "at"),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # BigInteger on Postgres (audit log will grow), Integer on SQLite so the
+    # autoincrement actually works in local dev.
+    id = Column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     org_id = Column(Integer, ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)

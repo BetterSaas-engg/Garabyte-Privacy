@@ -39,6 +39,10 @@ alembic upgrade head
 # Populate three synthetic demo tenants
 python -m app.seed
 
+# Create the bootstrap admin user + memberships on the demo tenants.
+# Prints a generated password unless you pass --password.
+python -m app.bootstrap --seed-memberships
+
 # Run the API
 uvicorn app.main:app --reload --port 8001
 ```

@@ -1,8 +1,8 @@
 """phase 3 auth tables
 
-Revision ID: 30eb69aa42a8
+Revision ID: 3c3cb2b363f7
 Revises: b54d2f396450
-Create Date: 2026-04-25 18:15:42.391533
+Create Date: 2026-04-25 18:35:27.892113
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '30eb69aa42a8'
+revision: str = '3c3cb2b363f7'
 down_revision: Union[str, Sequence[str], None] = 'b54d2f396450'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -35,7 +35,7 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_users_id'), ['id'], unique=False)
 
     op.create_table('access_log',
-    sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
+    sa.Column('id', sa.BigInteger().with_variant(sa.Integer(), 'sqlite'), autoincrement=True, nullable=False),
     sa.Column('at', sa.DateTime(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('org_id', sa.Integer(), nullable=True),
