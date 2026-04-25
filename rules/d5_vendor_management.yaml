@@ -120,7 +120,7 @@ questions:
         label: Living TIA register with ongoing review
 
 gap_remediation_library:
-  - trigger_condition: "avg_score < 1.5"
+  - score_max: 1.5
     severity: critical
     finding: Vendor privacy risk is uncontrolled
     recommendation: >
@@ -130,7 +130,8 @@ gap_remediation_library:
     regulatory_risk: Law 25 s. 17 non-compliance on cross-border transfers can trigger penalties; vendor breaches become your breaches.
     typical_consulting_hours: 40
 
-  - trigger_condition: "1.5 <= avg_score < 2.5"
+  - score_min: 1.5
+    score_max: 2.5
     severity: high
     finding: Intake exists but DPAs are inconsistent and sub-processor visibility is low
     recommendation: >
@@ -138,10 +139,27 @@ gap_remediation_library:
       a sub-processor register. Establish re-assessment cadence for top vendors.
     typical_consulting_hours: 24
 
-  - trigger_condition: "2.5 <= avg_score < 3.5"
+  - score_min: 2.5
+    score_max: 3.5
     severity: moderate
     finding: Vendor management mature but not automated
     recommendation: >
       Consider third-party risk management tooling to automate assessments and
       monitoring. Focus automation on the highest-risk vendor tier first.
     typical_consulting_hours: 12
+
+  # Strengths tier (score >= 3.5). Placeholder content -- Garabyte to refine
+  # with dimension-specific optimization guidance. Added per audit M15 so
+  # high-scoring clients see findings rather than an empty gaps array.
+  - score_min: 3.5
+    severity: low
+    finding: Strong program in this dimension - focus on optimization, not remediation
+    recommendation: >
+      The dimension is operating at "Managed" or "Optimized" level. Maintenance
+      and continuous improvement matter more than new build. Consider codifying
+      lessons learned into reusable playbooks, applying this dimension's
+      practices to weaker areas of the program, and identifying tooling
+      investments that scale the team's effectiveness rather than expand
+      headcount. A Garabyte review can identify dimension-specific
+      optimization opportunities relative to your industry peers.
+    typical_consulting_hours: 6

@@ -126,7 +126,7 @@ questions:
         label: Real-time withdrawal propagation with audit trail
 
 gap_remediation_library:
-  - trigger_condition: "avg_score < 1.5"
+  - score_max: 1.5
     severity: critical
     finding: Consent capture is ad hoc, regulatory defensibility is low
     recommendation: >
@@ -136,7 +136,8 @@ gap_remediation_library:
     regulatory_risk: High — CASL and Law 25 both carry significant penalties and easy-to-prove violations.
     typical_consulting_hours: 30
 
-  - trigger_condition: "1.5 <= avg_score < 2.5"
+  - score_min: 1.5
+    score_max: 2.5
     severity: high
     finding: Consent captured but downstream propagation is weak
     recommendation: >
@@ -145,10 +146,27 @@ gap_remediation_library:
       within 48 hours.
     typical_consulting_hours: 20
 
-  - trigger_condition: "2.5 <= avg_score < 3.5"
+  - score_min: 2.5
+    score_max: 3.5
     severity: moderate
     finding: Consent operations strong but not yet dynamic
     recommendation: >
       Evaluate consent management platforms (CMPs) to automate lifecycle
       management, especially for CASL renewal tracking.
     typical_consulting_hours: 10
+
+  # Strengths tier (score >= 3.5). Placeholder content -- Garabyte to refine
+  # with dimension-specific optimization guidance. Added per audit M15 so
+  # high-scoring clients see findings rather than an empty gaps array.
+  - score_min: 3.5
+    severity: low
+    finding: Strong program in this dimension - focus on optimization, not remediation
+    recommendation: >
+      The dimension is operating at "Managed" or "Optimized" level. Maintenance
+      and continuous improvement matter more than new build. Consider codifying
+      lessons learned into reusable playbooks, applying this dimension's
+      practices to weaker areas of the program, and identifying tooling
+      investments that scale the team's effectiveness rather than expand
+      headcount. A Garabyte review can identify dimension-specific
+      optimization opportunities relative to your industry peers.
+    typical_consulting_hours: 6

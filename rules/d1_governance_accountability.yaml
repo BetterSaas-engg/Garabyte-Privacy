@@ -125,7 +125,7 @@ questions:
         label: Living ROPA integrated with data inventory tooling
 
 gap_remediation_library:
-  - trigger_condition: "avg_score < 1.5"
+  - score_max: 1.5
     severity: critical
     finding: No clear accountability structure for privacy
     recommendation: >
@@ -135,7 +135,8 @@ gap_remediation_library:
     regulatory_risk: PIPEDA Principle 1 non-compliance — privacy commissioner may order structural remediation following a complaint.
     typical_consulting_hours: 20
 
-  - trigger_condition: "1.5 <= avg_score < 2.5"
+  - score_min: 1.5
+    score_max: 2.5
     severity: high
     finding: Privacy program exists but lacks executive visibility
     recommendation: >
@@ -144,7 +145,8 @@ gap_remediation_library:
       Formalize the privacy officer's budget and mandate in writing.
     typical_consulting_hours: 12
 
-  - trigger_condition: "2.5 <= avg_score < 3.5"
+  - score_min: 2.5
+    score_max: 3.5
     severity: moderate
     finding: Program mature but not strategically integrated
     recommendation: >
@@ -152,3 +154,19 @@ gap_remediation_library:
       metrics to executive scorecards. Build privacy champions network across
       business units with quarterly training.
     typical_consulting_hours: 8
+
+  # Strengths tier (score >= 3.5). Placeholder content -- Garabyte to refine
+  # with dimension-specific optimization guidance. Added per audit M15 so
+  # high-scoring clients see findings rather than an empty gaps array.
+  - score_min: 3.5
+    severity: low
+    finding: Strong program in this dimension - focus on optimization, not remediation
+    recommendation: >
+      The dimension is operating at "Managed" or "Optimized" level. Maintenance
+      and continuous improvement matter more than new build. Consider codifying
+      lessons learned into reusable playbooks, applying this dimension's
+      practices to weaker areas of the program, and identifying tooling
+      investments that scale the team's effectiveness rather than expand
+      headcount. A Garabyte review can identify dimension-specific
+      optimization opportunities relative to your industry peers.
+    typical_consulting_hours: 6

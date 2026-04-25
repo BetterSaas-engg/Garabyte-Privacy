@@ -14,11 +14,11 @@ Design by contract:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+import math
+from dataclasses import dataclass, asdict
 from typing import Any
-import re
 
-from .rules_loader import RulesLibrary, Dimension
+from .rules_loader import RulesLibrary, Dimension, MaturityLevel
 
 
 @dataclass
@@ -30,6 +30,27 @@ class DimensionScore:
     weight: float
     question_count: int
     answered_count: int
+    # Confidence in this dimension's score, derived from answered ratio:
+    #   "high"   -> >= 80% of questions answered
+    #   "low"    -> 40-80% answered
+    #   "none"   -> <40% answered (treat as no usable signal)
+    # The score and maturity_label are still populated when confidence is
+    # "low" or "none" so the engine output stays internally consistent, but
+    # the UI / overall score should treat "none" as "no data" rather than
+    # "Ad hoc". See C4 / M14 in the audit.
+    confidence: str = "high"
+
+
+def _confidence_for(answered: int, total: int) -> str:
+    """Map answered/total ratio to a discrete confidence tier."""
+    if total <= 0:
+        return "none"
+    ratio = answered / total
+    if ratio >= 0.8:
+        return "high"
+    if ratio >= 0.4:
+        return "low"
+    return "none"
 
 
 @dataclass
@@ -51,80 +72,46 @@ class AssessmentResult:
     overall_maturity_label: str
     dimension_scores: list[DimensionScore]
     gaps: list[GapFinding]
+    # Coverage = (dimensions with confidence != "none") / (total dimensions).
+    # 1.0 means every dimension produced a usable score; values below 1.0
+    # mean the overall score is computed over a partial set. The UI should
+    # surface this so consultants don't read a partial overall as final.
+    coverage: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "overall_score": round(self.overall_score, 2),
             "overall_maturity_label": self.overall_maturity_label,
+            "coverage": round(self.coverage, 2),
             "dimension_scores": [asdict(ds) for ds in self.dimension_scores],
             "gaps": [asdict(g) for g in self.gaps],
         }
 
 
-# Maturity labels matching the YAML files
-_MATURITY_LABELS = {
-    0: "Ad hoc",
-    1: "Developing",
-    2: "Defined",
-    3: "Managed",
-    4: "Optimized",
-}
-
-
-def _score_to_label(score: float) -> str:
-    """Map a continuous score in [0, 4] to its nearest maturity label."""
-    rounded = max(0, min(4, round(score)))
-    return _MATURITY_LABELS[rounded]
-
-
-def _evaluate_trigger(trigger: str, avg_score: float) -> bool:
+def _score_to_label(score: float, maturity_levels: list[MaturityLevel]) -> str:
     """
-    Evaluate a trigger condition like 'avg_score < 1.5' or '1.5 <= avg_score < 2.5'.
+    Map a continuous score in [0, 4] to its nearest maturity label, looking
+    up the label from the dimension's own maturity_levels (so dimension-
+    specific rewordings flow through to the score). The YAML files are the
+    source of truth for label text -- this function never hardcodes labels.
 
-    Hand-rolled parser -- we do NOT use Python's eval() because that would execute
-    arbitrary code if a YAML file were compromised. Only accepts the specific
-    comparison patterns we use.
+    Uses half-up rounding (math.floor(score + 0.5)) rather than Python's
+    built-in round(), which is banker's rounding (rounds .5 to nearest even
+    -- so round(0.5) == 0 and round(2.5) == 2). Half-up is what consultants
+    and customers expect; predictability beats statistical neutrality here.
 
-    Supported forms:
-      avg_score < X
-      avg_score <= X
-      avg_score > X
-      avg_score >= X
-      X <= avg_score < Y
-      X < avg_score <= Y
-      X <= avg_score <= Y
-      X < avg_score < Y
-
-    Unknown forms return False (fail-safe: no match = no finding fires).
+    Note: there is a known label/trigger boundary disagreement at score 1.5
+    (label says "Defined" but the YAML triggers fire the Developing-tier
+    remediation for the range 1.5 <= avg_score < 2.5). Resolving that is a
+    content decision for Garabyte -- see M16 in the audit.
     """
-    t = trigger.strip()
-    if not t:
-        return False
-
-    # Single-ended: "avg_score OP X"
-    m = re.fullmatch(r"avg_score\s*(<|<=|>|>=)\s*([0-9.]+)", t)
-    if m:
-        op, rhs = m.group(1), float(m.group(2))
-        if op == "<": return avg_score < rhs
-        if op == "<=": return avg_score <= rhs
-        if op == ">": return avg_score > rhs
-        if op == ">=": return avg_score >= rhs
-
-    # Double-ended: "X OP_LO avg_score OP_HI Y"
-    m = re.fullmatch(
-        r"([0-9.]+)\s*(<|<=)\s*avg_score\s*(<|<=)\s*([0-9.]+)", t
-    )
-    if m:
-        lo = float(m.group(1))
-        op_lo = m.group(2)
-        op_hi = m.group(3)
-        hi = float(m.group(4))
-        lo_ok = (avg_score >= lo) if op_lo == "<=" else (avg_score > lo)
-        hi_ok = (avg_score <= hi) if op_hi == "<=" else (avg_score < hi)
-        return lo_ok and hi_ok
-
-    # Unknown syntax -- fail safe
-    return False
+    rounded = max(0, min(4, math.floor(score + 0.5)))
+    by_level = {ml.level: ml.label for ml in maturity_levels}
+    if rounded not in by_level:
+        raise ValueError(
+            f"Maturity level {rounded} missing from dimension's maturity_levels"
+        )
+    return by_level[rounded]
 
 
 def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> DimensionScore:
@@ -139,15 +126,20 @@ def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> Dimensi
         (q, responses[q.id]) for q in dimension.questions if q.id in responses
     ]
 
+    question_count = len(dimension.questions)
+    answered_count = len(answered)
+    confidence = _confidence_for(answered_count, question_count)
+
     if not answered:
         return DimensionScore(
             dimension_id=dimension.id,
             dimension_name=dimension.name,
             score=0.0,
-            maturity_label="Ad hoc",
+            maturity_label=_score_to_label(0.0, dimension.maturity_levels),
             weight=dimension.weight,
-            question_count=len(dimension.questions),
+            question_count=question_count,
             answered_count=0,
+            confidence=confidence,
         )
 
     total_weight = sum(q.weight for q, _ in answered)
@@ -158,10 +150,11 @@ def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> Dimensi
         dimension_id=dimension.id,
         dimension_name=dimension.name,
         score=dim_score,
-        maturity_label=_score_to_label(dim_score),
+        maturity_label=_score_to_label(dim_score, dimension.maturity_levels),
         weight=dimension.weight,
-        question_count=len(dimension.questions),
-        answered_count=len(answered),
+        question_count=question_count,
+        answered_count=answered_count,
+        confidence=confidence,
     )
 
 
@@ -172,7 +165,7 @@ def _generate_gaps(dimension: Dimension, dim_score: float) -> list[GapFinding]:
     """
     findings: list[GapFinding] = []
     for rem in dimension.gap_remediation_library:
-        if _evaluate_trigger(rem.trigger_condition, dim_score):
+        if rem.matches(dim_score):
             findings.append(
                 GapFinding(
                     dimension_id=dimension.id,
@@ -207,7 +200,9 @@ def score_assessment(
     for qid, val in responses.items():
         if qid not in known_question_ids:
             raise ValueError(f"Unknown question ID: {qid}")
-        if not isinstance(val, int) or val < 0 or val > 4:
+        # bool is a subclass of int in Python -- without the explicit bool
+        # check, True/False would silently coerce to 1/0.
+        if isinstance(val, bool) or not isinstance(val, int) or val < 0 or val > 4:
             raise ValueError(
                 f"Response for {qid} must be int 0-4, got {val!r}"
             )
@@ -218,19 +213,38 @@ def score_assessment(
     for dim in rules.dimensions:
         ds = _score_dimension(dim, responses)
         dim_scores.append(ds)
-        all_gaps.extend(_generate_gaps(dim, ds.score))
+        # Skip findings for "none"-confidence dimensions: firing remediation
+        # off too little data produces wrong gap labels (the partial-completion
+        # bug from C4). The UI should show "not enough data" for these.
+        if ds.confidence != "none":
+            all_gaps.extend(_generate_gaps(dim, ds.score))
 
-    # Overall = weighted mean of dimension scores
-    total_weight = sum(d.weight for d in rules.dimensions)
-    overall = sum(ds.score * ds.weight for ds in dim_scores) / total_weight
+    # Overall score is the weighted mean of dimensions with usable data.
+    # Skipped / barely-answered dimensions are excluded so a partial assessment
+    # doesn't drag the overall score down as if the customer reported "Ad hoc"
+    # for missing dimensions. Weights are renormalized over the included subset.
+    confident_dims = [ds for ds in dim_scores if ds.confidence != "none"]
+    if confident_dims:
+        included_weight = sum(ds.weight for ds in confident_dims)
+        overall = sum(ds.score * ds.weight for ds in confident_dims) / included_weight
+    else:
+        overall = 0.0
+
+    coverage = len(confident_dims) / len(dim_scores) if dim_scores else 0.0
 
     # Sort gaps by severity (critical first), then by lowest score
     severity_rank = {"critical": 0, "high": 1, "moderate": 2, "low": 3}
     all_gaps.sort(key=lambda g: (severity_rank.get(g.severity, 99), g.score))
 
+    # Use the first dimension's maturity_levels for the overall label.
+    # RulesLibrary.validate() enforces that all dimensions agree on labels,
+    # so any dimension would give the same answer here.
+    overall_levels = rules.dimensions[0].maturity_levels
+
     return AssessmentResult(
         overall_score=overall,
-        overall_maturity_label=_score_to_label(overall),
+        overall_maturity_label=_score_to_label(overall, overall_levels),
         dimension_scores=dim_scores,
         gaps=all_gaps,
+        coverage=coverage,
     )

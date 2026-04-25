@@ -22,6 +22,11 @@ COPY backend/app/ ./app/
 # Copy the rules library from the project root
 COPY rules/ ./rules/
 
+# Run as a non-root user (UID 1000). Keeps any future RCE in app or
+# dependency from getting full container privileges.
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # Railway provides PORT env var; default to 8000 if not set
 ENV PORT=8000
 EXPOSE 8000

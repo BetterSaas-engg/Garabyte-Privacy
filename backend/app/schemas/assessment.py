@@ -34,7 +34,9 @@ class ResponseSubmit(BaseModel):
 
 class BulkResponsesSubmit(BaseModel):
     """Payload for POST /assessments/{id}/responses -- array of responses."""
-    responses: list[ResponseSubmit] = Field(..., min_length=1)
+    # max_length=200 is well above the current 40 actual questions; keeps a
+    # malicious or runaway client from POSTing gigabytes of responses.
+    responses: list[ResponseSubmit] = Field(..., min_length=1, max_length=200)
 
 
 class BulkResponsesResult(BaseModel):

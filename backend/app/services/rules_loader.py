@@ -40,14 +40,42 @@ class Question:
 
 @dataclass
 class GapRemediation:
-    """A remediation entry that fires when a score meets its trigger condition."""
+    """
+    A remediation entry that fires when a dimension's score falls in a range.
+
+    Trigger semantics: fires when (score_min is None or score >= score_min)
+    AND (score_max is None or score < score_max), with min/max inclusivity
+    controlled by the *_inclusive flags. Defaults match the original YAML
+    convention: low side inclusive, high side exclusive.
+    """
     severity: str  # "critical" | "high" | "moderate" | "low"
-    trigger_condition: str  # e.g. "avg_score < 1.5"
     finding: str
     recommendation: str
+    score_min: float | None = None
+    score_max: float | None = None
+    min_inclusive: bool = True
+    max_inclusive: bool = False
     regulatory_risk: str | None = None
     typical_consulting_hours: int | None = None
     upsell_hook: str | None = None
+
+    def matches(self, score: float) -> bool:
+        """Does this remediation fire for the given dimension score?"""
+        if self.score_min is not None:
+            if self.min_inclusive:
+                if score < self.score_min:
+                    return False
+            else:
+                if score <= self.score_min:
+                    return False
+        if self.score_max is not None:
+            if self.max_inclusive:
+                if score > self.score_max:
+                    return False
+            else:
+                if score >= self.score_max:
+                    return False
+        return True
 
 
 @dataclass
@@ -100,6 +128,9 @@ class RulesLibrary:
         - Every dimension has at least one question
         - Each dimension's question weights sum to 1.0
         - Every question has at least one option
+        - Every dimension defines all 5 maturity levels (0-4)
+        - All dimensions agree on the maturity label text (so the engine has
+          a single source of truth for "what does score 2 look like")
         """
         if not self.dimensions:
             raise ValueError("Rules library is empty")
@@ -126,6 +157,27 @@ class RulesLibrary:
                         f"Question {q.id} in {d.id} has no options"
                     )
 
+            # Each dimension must define all 5 maturity levels.
+            level_keys = sorted(ml.level for ml in d.maturity_levels)
+            if level_keys != [0, 1, 2, 3, 4]:
+                raise ValueError(
+                    f"Dimension {d.id} maturity_levels must define exactly "
+                    f"levels 0-4, got {level_keys}"
+                )
+
+        # All dimensions must use the same label text per level. Drift
+        # between dimensions would let the engine produce inconsistent
+        # overall vs per-dimension labels.
+        canonical = {ml.level: ml.label for ml in self.dimensions[0].maturity_levels}
+        for d in self.dimensions[1:]:
+            for ml in d.maturity_levels:
+                if canonical.get(ml.level) != ml.label:
+                    raise ValueError(
+                        f"Dimension {d.id} maturity_levels disagree with "
+                        f"{self.dimensions[0].id}: level {ml.level} is "
+                        f"{ml.label!r} here vs {canonical.get(ml.level)!r} there"
+                    )
+
 
 # ---- Parsers: convert YAML dicts to dataclass instances ----
 
@@ -146,11 +198,29 @@ def _parse_question(raw: dict[str, Any]) -> Question:
 
 
 def _parse_gap_remediation(raw: dict[str, Any]) -> GapRemediation:
+    if "trigger_condition" in raw or "trigger" in raw:
+        raise ValueError(
+            "trigger_condition string format is no longer supported. "
+            "Use structured score_min / score_max fields instead "
+            "(see rules_loader.GapRemediation docstring)."
+        )
+
+    score_min = raw.get("score_min")
+    score_max = raw.get("score_max")
+    if score_min is None and score_max is None:
+        raise ValueError(
+            f"Gap remediation must specify at least one of score_min / "
+            f"score_max (rule: {raw.get('finding', '<unnamed>')!r})"
+        )
+
     return GapRemediation(
         severity=raw.get("severity", "moderate"),
-        trigger_condition=raw.get("trigger_condition") or raw.get("trigger", ""),
         finding=raw.get("finding", ""),
         recommendation=raw.get("recommendation", ""),
+        score_min=float(score_min) if score_min is not None else None,
+        score_max=float(score_max) if score_max is not None else None,
+        min_inclusive=bool(raw.get("min_inclusive", True)),
+        max_inclusive=bool(raw.get("max_inclusive", False)),
         regulatory_risk=raw.get("regulatory_risk"),
         typical_consulting_hours=(
             raw.get("typical_consulting_hours") or raw.get("hours")
