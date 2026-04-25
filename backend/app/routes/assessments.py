@@ -102,6 +102,7 @@ def submit_responses(
         if existing:
             existing.value = r.value
             existing.note = r.note
+            existing.evidence_url = r.evidence_url
             existing.answered_at = datetime.utcnow()
             updated += 1
         else:
@@ -110,6 +111,7 @@ def submit_responses(
                 question_id=r.question_id,
                 value=r.value,
                 note=r.note,
+                evidence_url=r.evidence_url,
             ))
             created += 1
 
@@ -148,7 +150,10 @@ def finalize_assessment(assessment_id: int, db: Session = Depends(get_db)):
     if not responses:
         raise HTTPException(400, "No responses submitted yet")
 
-    result = score_assessment(RULES, responses)
+    evidence_provided = {
+        r.question_id: bool(r.evidence_url) for r in assessment.responses
+    }
+    result = score_assessment(RULES, responses, evidence_provided)
     result_dict = result.to_dict()
 
     assessment.overall_score = result.overall_score

@@ -30,6 +30,16 @@ class ResponseSubmit(BaseModel):
     question_id: str = Field(..., min_length=1, max_length=32)
     value: int = Field(..., ge=0, le=4)
     note: Optional[str] = Field(None, max_length=2000)
+    # Optional pointer to evidence (a doc the consultant can click through
+    # to verify the answer). Restricted to http/https so we don't accept
+    # javascript:, file://, data:, etc. The 512-char cap matches the model
+    # column length. Frontend should never render this URL without
+    # treating it as untrusted user input.
+    evidence_url: Optional[str] = Field(
+        None,
+        max_length=512,
+        pattern=r"^https?://",
+    )
 
 
 class BulkResponsesSubmit(BaseModel):

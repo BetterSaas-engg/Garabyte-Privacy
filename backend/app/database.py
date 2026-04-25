@@ -62,5 +62,17 @@ def get_db():
 
 
 def init_db() -> None:
-    """Create all tables. Safe to call repeatedly -- idempotent."""
+    """
+    Create all tables from the SQLAlchemy metadata. Safe to call repeatedly
+    -- create_all is idempotent on existing tables.
+
+    Note: this is fine for fresh local dev and the current single-instance
+    Railway deployment, but it does NOT apply schema changes once the
+    initial schema is in place. For schema evolution, use alembic:
+
+        alembic revision --autogenerate -m "describe the change"
+        alembic upgrade head
+
+    See alembic/README and docs/architecture.md for the full workflow.
+    """
     Base.metadata.create_all(bind=engine)

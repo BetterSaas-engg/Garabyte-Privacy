@@ -19,6 +19,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the backend application code
 COPY backend/app/ ./app/
 
+# Copy alembic config + migrations so the container can apply schema
+# updates with `alembic upgrade head` (typically as a Railway release-phase
+# command before the web process starts).
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/alembic/ ./alembic/
+
 # Copy the rules library from the project root
 COPY rules/ ./rules/
 

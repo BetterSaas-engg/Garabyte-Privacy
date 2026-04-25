@@ -13,6 +13,7 @@ Design principles:
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -110,6 +111,12 @@ class Dimension:
 class RulesLibrary:
     """The complete rules library ��� all 8 dimensions plus validation."""
     dimensions: list[Dimension]
+    # Short stable identifier for the loaded YAML content. Used to stamp
+    # AssessmentResult so a stored report can be traced to the rules version
+    # in effect when it was scored. Computed at load time as sha256(concat
+    # YAML file contents) truncated to 12 hex chars. Coarse but reliable --
+    # any change to a YAML (including comments) bumps the version.
+    version: str = "unknown"
 
     def by_id(self, dimension_id: str) -> Dimension:
         """Find a dimension by its id (e.g. 'd1'). Raises KeyError if missing."""
@@ -291,12 +298,23 @@ def load_rules_library(rules_dir: Path | str) -> RulesLibrary:
             f"No .yaml files found in {rules_path}"
         )
 
+    # Hash the raw YAML bytes (in alphabetical filename order) to produce a
+    # stable rules version. Any edit to any YAML -- including comments --
+    # bumps the hash, which is the right grain for "did the rules change."
+    hasher = hashlib.sha256()
+    for yaml_file in yaml_files:
+        hasher.update(yaml_file.name.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(yaml_file.read_bytes())
+        hasher.update(b"\0")
+    version = hasher.hexdigest()[:12]
+
     for yaml_file in yaml_files:
         with open(yaml_file, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         all_dimensions.append(_parse_dimension(raw))
 
-    library = RulesLibrary(dimensions=all_dimensions)
+    library = RulesLibrary(dimensions=all_dimensions, version=version)
     library.validate()
     return library
 

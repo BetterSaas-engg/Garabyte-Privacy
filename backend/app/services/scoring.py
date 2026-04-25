@@ -16,9 +16,16 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 from typing import Any
 
 from .rules_loader import RulesLibrary, Dimension, MaturityLevel
+
+
+# Bump when the result_json shape changes in a way the frontend or stored
+# reports must handle differently. Keep this with the dataclass shapes it
+# describes -- they evolve together.
+RESULT_SCHEMA_VERSION = 1
 
 
 @dataclass
@@ -39,6 +46,12 @@ class DimensionScore:
     # the UI / overall score should treat "none" as "no data" rather than
     # "Ad hoc". See C4 / M14 in the audit.
     confidence: str = "high"
+    # Fraction of answered questions that have evidence attached
+    # (evidence_url provided). 0.0 means "self-reported only," 1.0 means
+    # every answer has been linked to documentation the consultant can
+    # verify. The frontend uses this to render a "verified" vs
+    # "self-reported" badge per dimension. See H9 in the audit.
+    evidence_coverage: float = 0.0
 
 
 def _confidence_for(answered: int, total: int) -> str:
@@ -77,9 +90,23 @@ class AssessmentResult:
     # mean the overall score is computed over a partial set. The UI should
     # surface this so consultants don't read a partial overall as final.
     coverage: float = 1.0
+    # Identifier of the rules library used to score this result. Lets a
+    # stored report be traced back to the YAML content in effect at the
+    # time of scoring. Comes from RulesLibrary.version.
+    rules_version: str = "unknown"
+    # ISO-8601 UTC timestamp of when score_assessment was called. Distinct
+    # from Assessment.completed_at -- this is when the score was computed,
+    # which is what regulators care about when validating a stored report.
+    assessed_at: str = ""
+    # Result-payload schema version. Bump when frontend / stored-report
+    # consumers need to handle shape changes.
+    schema_version: int = RESULT_SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
+            "rules_version": self.rules_version,
+            "assessed_at": self.assessed_at,
             "overall_score": round(self.overall_score, 2),
             "overall_maturity_label": self.overall_maturity_label,
             "coverage": round(self.coverage, 2),
@@ -114,13 +141,20 @@ def _score_to_label(score: float, maturity_levels: list[MaturityLevel]) -> str:
     return by_level[rounded]
 
 
-def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> DimensionScore:
+def _score_dimension(
+    dimension: Dimension,
+    responses: dict[str, int],
+    evidence_provided: dict[str, bool] | None = None,
+) -> DimensionScore:
     """
     Weighted average of question scores for one dimension.
 
     If some questions are unanswered, we only average over the answered ones
     (weights are renormalized to the subset). If zero questions are answered,
     the dimension scores 0.0 -- a blank section reads as "Ad hoc", not "missing".
+
+    evidence_provided is an optional map of question_id -> whether the answer
+    has an evidence URL attached. Used to compute evidence_coverage.
     """
     answered = [
         (q, responses[q.id]) for q in dimension.questions if q.id in responses
@@ -129,6 +163,15 @@ def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> Dimensi
     question_count = len(dimension.questions)
     answered_count = len(answered)
     confidence = _confidence_for(answered_count, question_count)
+
+    # Evidence coverage = fraction of answered questions with evidence attached.
+    if answered and evidence_provided:
+        with_evidence = sum(
+            1 for q, _ in answered if evidence_provided.get(q.id, False)
+        )
+        evidence_coverage = with_evidence / answered_count
+    else:
+        evidence_coverage = 0.0
 
     if not answered:
         return DimensionScore(
@@ -140,6 +183,7 @@ def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> Dimensi
             question_count=question_count,
             answered_count=0,
             confidence=confidence,
+            evidence_coverage=0.0,
         )
 
     total_weight = sum(q.weight for q, _ in answered)
@@ -155,6 +199,7 @@ def _score_dimension(dimension: Dimension, responses: dict[str, int]) -> Dimensi
         question_count=question_count,
         answered_count=answered_count,
         confidence=confidence,
+        evidence_coverage=evidence_coverage,
     )
 
 
@@ -185,10 +230,17 @@ def _generate_gaps(dimension: Dimension, dim_score: float) -> list[GapFinding]:
 def score_assessment(
     rules: RulesLibrary,
     responses: dict[str, int],
+    evidence_provided: dict[str, bool] | None = None,
 ) -> AssessmentResult:
     """
     Main entry point. Given the rules library and a set of responses,
     return an AssessmentResult with dimension scores, overall score, and gaps.
+
+    evidence_provided is an optional map of question_id -> whether the answer
+    has an evidence URL attached. When supplied, each DimensionScore carries
+    an evidence_coverage stat (% of answered questions with evidence). When
+    omitted, evidence_coverage is reported as 0.0 across the board (the
+    typical case for synthetic seed data and tests).
 
     Raises ValueError if any response uses an unknown question ID
     or a value outside [0, 4].
@@ -211,7 +263,7 @@ def score_assessment(
     all_gaps: list[GapFinding] = []
 
     for dim in rules.dimensions:
-        ds = _score_dimension(dim, responses)
+        ds = _score_dimension(dim, responses, evidence_provided)
         dim_scores.append(ds)
         # Skip findings for "none"-confidence dimensions: firing remediation
         # off too little data produces wrong gap labels (the partial-completion
@@ -247,4 +299,6 @@ def score_assessment(
         dimension_scores=dim_scores,
         gaps=all_gaps,
         coverage=coverage,
+        rules_version=rules.version,
+        assessed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
