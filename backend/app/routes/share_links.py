@@ -30,6 +30,7 @@ from ..auth.deps import ensure_membership, get_current_user
 from ..auth.rate import limiter
 from ..auth.service import log_access
 from ..database import get_db
+from ..services.jurisdictions import filter_regulatory_text
 from ..models import (
     Assessment,
     AssessmentPublication,
@@ -312,6 +313,11 @@ def read_shared_report(
     )
     db.commit()
 
+    # M22 jurisdiction filter — drop regulatory citations to laws the
+    # tenant doesn't operate under. A US-only customer's board-shared
+    # report shouldn't cite Quebec Law 25.
+    tenant_codes = (tenant.jurisdiction_codes if tenant else None) or None
+
     return SharedReportOut(
         tenant_name=tenant.name if tenant else "—",
         assessment_label=a.label,
@@ -325,7 +331,7 @@ def read_shared_report(
                 severity=f.severity,
                 finding_text=f.finding_text,
                 recommendation=f.recommendation,
-                regulatory_risk=f.regulatory_risk,
+                regulatory_risk=filter_regulatory_text(f.regulatory_risk, tenant_codes),
             )
             for f in findings
         ],

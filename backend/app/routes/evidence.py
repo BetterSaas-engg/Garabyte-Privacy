@@ -79,6 +79,36 @@ _ALLOWED_MIMES = {
 }
 
 
+# Magic-byte signatures for the binary types in the allowlist. Used to
+# refuse uploads whose actual contents disagree with the reported MIME —
+# the client-supplied Content-Type is fully attacker-controlled, so a
+# byte-level check is the only reliable verification short of pulling in
+# python-magic. Plain-text formats (txt/csv) have no signature; we accept
+# them after the size + extension checks.
+_MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
+    "application/pdf": (b"%PDF-",),
+    # ZIP-container Office formats (docx, xlsx). The ZIP magic is "PK\x03\x04";
+    # we accept any of those three flavours of ZIP under that header.
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (b"PK\x03\x04",),
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (b"PK\x03\x04",),
+    # Legacy Office: OLE2 compound document.
+    "application/msword": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
+    "application/vnd.ms-excel": (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "image/webp": (b"RIFF",),
+}
+
+
+def _content_matches_mime(blob: bytes, mime: str) -> bool:
+    """Confirm the upload's leading bytes match the expected signature."""
+    sigs = _MAGIC_SIGNATURES.get(mime)
+    if not sigs:  # text/* — no binary signature to verify
+        return True
+    return any(blob.startswith(s) for s in sigs)
+
+
 class EvidenceFileOut(BaseModel):
     id: int
     response_id: int
@@ -157,6 +187,21 @@ async def upload_evidence(
         raise HTTPException(
             status_code=413,
             detail=f"File exceeds {settings.evidence_max_bytes // (1024 * 1024)} MB cap",
+        )
+
+    # Magic-byte check: refuse uploads whose contents disagree with the
+    # reported MIME. The Content-Type header is fully attacker-controlled,
+    # so without this an attacker could ship `evil.html` with
+    # Content-Type: image/png and have the download path stream it back
+    # for a stored-XSS chain. Plain text formats (txt/csv) skip the
+    # signature check; size + extension cap them sufficiently.
+    if not _content_matches_mime(raw[:32], mime):
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                f"File contents don't match reported MIME ({mime}). "
+                "Upload rejected."
+            ),
         )
 
     # Write to storage (UUID-named) — original filename never reaches disk
@@ -246,11 +291,20 @@ def download_evidence(
     except FileNotFoundError:
         raise HTTPException(410, "Evidence file no longer available")
 
+    # `attachment` (not `inline`) plus nosniff defends against any HTML or
+    # script-shaped payload that slipped past the upload-time magic-byte
+    # check. The customer downloads the file rather than the browser
+    # rendering it in-place; same-origin cookies can't be exfiltrated by
+    # a malicious payload because the browser won't execute it. Filename
+    # is quoted defensively (escapes are minimal because the model column
+    # caps it at 255 chars).
+    safe_name = ev.original_filename.replace('"', "").replace("\\", "")[:255]
     return StreamingResponse(
         fh,
         media_type=ev.mime_type,
         headers={
-            "Content-Disposition": f'inline; filename="{ev.original_filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "X-Content-Type-Options": "nosniff",
             # Watermark hint surfaces in the response so a downstream
             # PDF-stamp middleware can latch onto it later.
             "X-Garabyte-Watermark-Reader": str(user.id),

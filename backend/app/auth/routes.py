@@ -520,6 +520,21 @@ def create_invitation(
     if not org:
         raise HTTPException(404, "Organization not found")
 
+    # Audit-fix: validate dimension_ids against the loaded rules library so
+    # an attacker can't seed a membership row with a junk or path-traversal
+    # dimension string. Section contributors fail-fast on out-of-scope
+    # questions (R&P C5), but the row still gets created if we don't gate
+    # on the way in.
+    if payload.dimension_ids:
+        from ..main import RULES
+        valid = {d.id for d in RULES.dimensions}
+        bad = [d for d in payload.dimension_ids if d not in valid]
+        if bad:
+            raise HTTPException(
+                400,
+                f"Unknown dimension id(s): {', '.join(bad)}",
+            )
+
     email = _normalize_email(payload.email)
     plaintext = mint_token(
         db,

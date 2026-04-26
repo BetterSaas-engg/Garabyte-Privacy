@@ -59,9 +59,30 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
+
+
+# CSRF defense — every mutating request must carry X-Requested-With.
+# That header is non-simple under CORS, so it forces a preflight; the
+# preflight is gated by allow_origins (not "*"), so a third-party site
+# can't fire the request even with a stolen cookie. Defense-in-depth on
+# top of SameSite=Lax on the session cookie. The only routes that mutate
+# without this header are the public share-link reads (GET) and the
+# auth flows (which receive the header from our own SPA).
+@app.middleware("http")
+async def require_xrw_on_mutations(request, call_next):
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Allow OpenAPI-doc CSRF-equivalent paths (browser tests via /docs)
+        # AND the OPTIONS preflights handled by CORSMiddleware above.
+        if request.headers.get("x-requested-with") != "garabyte":
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Missing X-Requested-With header"},
+            )
+    return await call_next(request)
 
 
 @app.on_event("startup")

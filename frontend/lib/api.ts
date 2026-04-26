@@ -45,6 +45,11 @@ async function apiRequest<T>(
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      // CSRF defense — backend rejects mutating requests without this.
+      // The header is non-simple under CORS so it forces a preflight,
+      // and our CORS allowlist won't permit the preflight from a
+      // third-party origin even with a stolen cookie.
+      "X-Requested-With": "garabyte",
       ...(options.headers ?? {}),
     },
   });
@@ -373,6 +378,7 @@ export function uploadEvidence(responseId: number, file: File): Promise<Evidence
   return fetch(`${API_URL}/responses/${responseId}/evidence`, {
     method: "POST",
     credentials: "include",
+    headers: { "X-Requested-With": "garabyte" },
     body: fd,
   }).then(async (r) => {
     if (!r.ok) {

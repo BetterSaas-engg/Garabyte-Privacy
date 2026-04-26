@@ -25,7 +25,10 @@ class Response(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     assessment_id = Column(
-        Integer, ForeignKey("assessments.id"), nullable=False, index=True
+        Integer,
+        ForeignKey("assessments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     question_id = Column(String(32), nullable=False)
     # Nullable: a skipped row carries no value. Application-layer validation

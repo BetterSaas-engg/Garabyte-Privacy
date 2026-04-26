@@ -20,7 +20,12 @@ class Assessment(Base):
     __tablename__ = "assessments"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(
+        Integer,
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     label = Column(String(255), nullable=True)  # e.g. "Q1 2026 Review"
     status = Column(String(32), default="in_progress")  # in_progress | completed
     overall_score = Column(Float, nullable=True)
