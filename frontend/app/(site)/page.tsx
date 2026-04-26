@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   getTenants,
   getTenantHistory,
@@ -13,42 +12,81 @@ import type { Tenant, TenantHistoryItem } from "@/lib/types";
 import Link from "next/link";
 import { TenantCard } from "@/components/TenantCard";
 import { InviteModal } from "@/components/InviteModal";
+import { LandingPage } from "@/components/LandingPage";
 
 interface TenantWithHistory {
   tenant: Tenant;
   history: TenantHistoryItem[];
 }
 
+type AuthState = "checking" | "anon" | "authed";
+
 export default function Home() {
-  const router = useRouter();
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [me, setMe] = useState<WhoAmI | null>(null);
   const [data, setData] = useState<TenantWithHistory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [me, setMe] = useState<WhoAmI | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  // First pass: figure out whether the visitor is signed in. Anonymous
+  // visitors get the marketing landing page; authenticated visitors get
+  // the org list. Splitting this from the tenant load avoids the previous
+  // 401-then-redirect flash that gave anonymous visitors a blank screen.
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+    (async () => {
       try {
-        const [tenants, w] = await Promise.all([getTenants(), whoami()]);
+        const w = await whoami();
+        if (cancelled) return;
         setMe(w);
+        setAuthState("authed");
+      } catch (e) {
+        if (cancelled) return;
+        if (isUnauthorized(e)) {
+          setAuthState("anon");
+        } else {
+          // Backend reachable but something else broke — surface the error
+          // on the org list (anonymous visitors see the landing regardless).
+          setError(e instanceof Error ? e.message : String(e));
+          setAuthState("anon");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Second pass: only after we know the user is signed in, load tenants.
+  useEffect(() => {
+    if (authState !== "authed") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tenants = await getTenants();
         const withHistory = await Promise.all(
           tenants.map(async (t) => ({
             tenant: t,
             history: await getTenantHistory(t.slug),
-          }))
+          })),
         );
-        setData(withHistory);
+        if (!cancelled) setData(withHistory);
       } catch (e) {
-        if (isUnauthorized(e)) {
-          router.replace("/auth/login");
-          return;
-        }
-        setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }
-    }
-    load();
-  }, [router]);
+    })();
+    return () => { cancelled = true; };
+  }, [authState]);
 
+  if (authState === "checking") {
+    // Silent placeholder — keeps the flash short. The SiteHeader itself
+    // does its own auth check and renders sign-in/out independently.
+    return <main className="min-h-[calc(100vh-73px)]" />;
+  }
+
+  if (authState === "anon") {
+    return <LandingPage />;
+  }
+
+  // Authenticated org-list view (the previous Home component, unchanged).
   const memberships: AuthMembership[] = me?.memberships ?? [];
   const isGarabyteAdmin = memberships.some((m) => m.role === "garabyte_admin");
   const canInvite = memberships.some(
