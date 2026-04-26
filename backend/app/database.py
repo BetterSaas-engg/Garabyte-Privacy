@@ -11,7 +11,8 @@ postgresql+psycopg:// prefix.
 
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 
@@ -44,6 +45,20 @@ connect_args = (
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# SQLite ignores ondelete=CASCADE FK constraints unless this pragma is set
+# per-connection. Postgres enforces FKs natively, so this listener fires
+# but the EXEC is a no-op on the postgres dialect — guarded for safety.
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_fks(dbapi_connection, _connection_record):
+    if engine.dialect.name != "sqlite":
+        return
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
 def get_db():

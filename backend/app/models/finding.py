@@ -197,6 +197,15 @@ class AssessmentPublication(Base):
     )
     published_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     cover_note = Column(Text, nullable=True)
+    # Republish counter — bumps each time the consultant publishes after
+    # an unpublish-and-edit cycle. Outstanding share links are revoked at
+    # version-bump time so old recipients don't silently see new content.
+    version = Column(Integer, default=1, nullable=False)
+    # When set, the report is "in revision" — the row exists for version
+    # continuity but the C14 edit lock is lifted and customers should see
+    # the previous published version, not the in-flight changes. Cleared
+    # again on republish, with version bumped.
+    unpublished_at = Column(DateTime, nullable=True)
 
     # uselist=False on the BACKREF (the Assessment.publication side) so
     # accessing Assessment.publication returns a single row or None,
@@ -204,8 +213,70 @@ class AssessmentPublication(Base):
     # naturally many-to-one and doesn't need uselist tweaks.
     assessment = relationship(
         "Assessment",
-        backref=backref("publication", uselist=False),
+        backref=backref(
+            "publication",
+            uselist=False,
+            cascade="all, delete-orphan",
+            single_parent=True,
+        ),
     )
 
     def __repr__(self) -> str:
         return f"<AssessmentPublication assessment_id={self.assessment_id}>"
+
+
+class ShareLink(Base):
+    """
+    Read-only signed URL to a published assessment report (R&P C21).
+
+    Issued by an org admin so external recipients (a board, a regulator,
+    an auditor) can read the report without an account. The token in the
+    URL is the access credential — anyone holding it can read the bound
+    report until it expires or is revoked. Therefore:
+
+      - The token is generated with secrets.token_urlsafe(32) — 256 bits of
+        entropy, indistinguishable-from-random.
+      - We DO log every access (who hit the URL, when, from what IP).
+      - We DO NOT include the token in the audit-log context — only its id.
+        Don't write the access credential into a different access surface.
+      - Revocation is a flag, not a delete; the audit history needs the row.
+
+    The link is bound to the assessment, not to a specific publication row.
+    AssessmentPublication has a uniqueness constraint on assessment_id, so
+    "the publication" is unambiguous — but if a republish ever produces a
+    *new* publication, recipients of the old link should NOT silently see
+    the new content. Phase 8 republish flow re-issues a fresh token; old
+    tokens are revoked at the same time.
+    """
+    __tablename__ = "share_links"
+    __table_args__ = (
+        Index("ix_share_links_assessment_active", "assessment_id", "revoked_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    assessment_id = Column(
+        Integer,
+        ForeignKey("assessments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    issued_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    label = Column(String(120), nullable=True)  # e.g. "Q4 board review"
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True)
+    last_accessed_at = Column(DateTime, nullable=True)
+    access_count = Column(Integer, default=0, nullable=False)
+
+    assessment = relationship("Assessment")
+
+    def is_active(self, now: datetime) -> bool:
+        return self.revoked_at is None and self.expires_at > now
+
+    def __repr__(self) -> str:
+        return f"<ShareLink id={self.id} assessment_id={self.assessment_id}>"

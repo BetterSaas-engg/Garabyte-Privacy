@@ -26,6 +26,7 @@ from .routes import rules as rules_routes
 from .routes import tenants as tenants_routes
 from .routes import assessments as assessments_routes
 from .routes import admin as admin_routes
+from .routes import share_links as share_links_routes
 
 
 # Resolve rules directory — works in both local dev and Docker container
@@ -98,3 +99,4 @@ app.include_router(assessments_routes.assessments_router)
 app.include_router(assessments_routes.findings_router)
 app.include_router(assessments_routes.consultant_router)
 app.include_router(admin_routes.router)
+app.include_router(share_links_routes.router)

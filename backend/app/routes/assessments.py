@@ -714,8 +714,16 @@ def publish_assessment(
 ):
     """
     Consultant publishes the report to the customer. Locks further
-    annotation edits per R&P C14. Idempotent: returns the existing
-    publication row if one already exists.
+    annotation edits per R&P C14.
+
+    Three cases:
+      - First publish: creates a new pub row at version 1.
+      - Re-publish after unpublish: clears unpublished_at, bumps version,
+        refreshes published_at, replaces cover_note with the latest, and
+        revokes any outstanding share links bound to this assessment so
+        old recipients aren't shown new content (R&P C21).
+      - Already published with no in-flight unpublish: idempotent — returns
+        the existing row unchanged.
     """
     a = _load_assessment_or_404(db, assessment_id)
     if a.status != "completed":
@@ -731,23 +739,110 @@ def publish_assessment(
         .filter(AssessmentPublication.assessment_id == assessment_id)
         .first()
     )
+    if existing and existing.unpublished_at is None:
+        return existing
+
     if existing:
+        # Republish path — bump version, revoke old share links.
+        existing.version = (existing.version or 1) + 1
+        existing.unpublished_at = None
+        existing.published_at = datetime.utcnow()
+        existing.published_by_id = user.id
+        existing.cover_note = payload.cover_note
+        revoked = _revoke_share_links_for(db, assessment_id)
+        log_access(db, user_id=user.id, org_id=a.tenant_id,
+                   action="assessment.republish",
+                   resource_kind="assessment", resource_id=a.id,
+                   context={"version": existing.version, "revoked_links": revoked},
+                   ip=_ip(request))
+        db.commit()
+        db.refresh(existing)
         return existing
 
     pub = AssessmentPublication(
         assessment_id=assessment_id,
         published_by_id=user.id,
         cover_note=payload.cover_note,
+        version=1,
     )
     db.add(pub)
     db.flush()
     log_access(db, user_id=user.id, org_id=a.tenant_id,
                action="assessment.publish",
                resource_kind="assessment", resource_id=a.id,
+               context={"version": 1},
                ip=_ip(request))
     db.commit()
     db.refresh(pub)
     return pub
+
+
+@assessments_router.post(
+    "/{assessment_id}/unpublish",
+    response_model=PublicationOut,
+)
+def unpublish_assessment(
+    assessment_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Reopen the edit window so a consultant can revise the report. The pub
+    row stays for version continuity; the next publish bumps version and
+    revokes outstanding share links.
+
+    Already-unpublished is idempotent. The customer's view of the report
+    while unpublished is "previous version, awaiting revision" — the
+    frontend renders the existing row with the unpublished_at flag.
+    """
+    a = _load_assessment_or_404(db, assessment_id)
+    ensure_membership(
+        db, user, a.tenant_id,
+        roles=_FINDING_EDIT_ROLES,
+        request=request,
+        action="assessment.unpublish.check",
+    )
+    pub = (
+        db.query(AssessmentPublication)
+        .filter(AssessmentPublication.assessment_id == assessment_id)
+        .first()
+    )
+    if not pub:
+        raise HTTPException(400, "Assessment was never published")
+
+    if pub.unpublished_at is None:
+        pub.unpublished_at = datetime.utcnow()
+        log_access(db, user_id=user.id, org_id=a.tenant_id,
+                   action="assessment.unpublish",
+                   resource_kind="assessment", resource_id=a.id,
+                   context={"version": pub.version},
+                   ip=_ip(request))
+        db.commit()
+    db.refresh(pub)
+    return pub
+
+
+def _revoke_share_links_for(db: Session, assessment_id: int) -> int:
+    """
+    Revoke every active share link for an assessment. Returns count
+    revoked (so the caller can log it). Used on republish so old recipients
+    don't silently see new content (R&P C21 + the ShareLink model docstring).
+    """
+    from ..models import ShareLink  # local import to avoid circular
+    now = datetime.utcnow()
+    rows = (
+        db.query(ShareLink)
+        .filter(
+            ShareLink.assessment_id == assessment_id,
+            ShareLink.revoked_at.is_(None),
+            ShareLink.expires_at > now,
+        )
+        .all()
+    )
+    for r in rows:
+        r.revoked_at = now
+    return len(rows)
 
 
 @findings_router.post(
@@ -778,12 +873,17 @@ def create_annotation(
         request=request,
         action="finding.annotate.check",
     )
-    if db.query(AssessmentPublication).filter(
-        AssessmentPublication.assessment_id == finding.assessment_id,
-    ).first():
+    pub = (
+        db.query(AssessmentPublication)
+        .filter(AssessmentPublication.assessment_id == finding.assessment_id)
+        .first()
+    )
+    if pub and pub.unpublished_at is None:
+        # Locked while published. Consultant can call /unpublish to reopen
+        # the edit window for a new version (Phase 8).
         raise HTTPException(
             status_code=423,
-            detail="Assessment is published; further annotations require a new version",
+            detail="Assessment is published; unpublish first to start a new version",
         )
 
     ann = FindingAnnotation(

@@ -349,6 +349,66 @@ export function createInvitation(payload: {
   });
 }
 
+// ---- Share links (Phase 8 / R&P C21) ----
+
+export interface ShareLink {
+  id: number;
+  token: string;
+  label: string | null;
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  last_accessed_at: string | null;
+  access_count: number;
+  issued_by_id: number | null;
+}
+
+export interface SharedReport {
+  tenant_name: string;
+  assessment_label: string | null;
+  overall_score: number | null;
+  overall_maturity: string | null;
+  published_at: string | null;
+  cover_note: string | null;
+  findings: {
+    dimension_id: string;
+    severity: string;
+    finding_text: string;
+    recommendation: string | null;
+    regulatory_risk: string | null;
+  }[];
+  share_label: string | null;
+  share_expires_at: string;
+}
+
+export function createShareLink(
+  assessmentId: number,
+  payload: { label?: string; expires_in_days?: number },
+): Promise<ShareLink> {
+  return apiRequest<ShareLink>(`/assessments/${assessmentId}/share-links`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listShareLinks(assessmentId: number): Promise<ShareLink[]> {
+  return apiRequest<ShareLink[]>(`/assessments/${assessmentId}/share-links`);
+}
+
+export function revokeShareLink(linkId: number): Promise<ShareLink> {
+  return apiRequest<ShareLink>(`/share-links/${linkId}/revoke`, { method: "POST" });
+}
+
+export function getSharedReport(token: string): Promise<SharedReport> {
+  return apiRequest<SharedReport>(`/share/${encodeURIComponent(token)}`);
+}
+
+export function unpublishAssessment(assessmentId: number): Promise<{ id: number }> {
+  return apiRequest<{ id: number }>(`/assessments/${assessmentId}/unpublish`, {
+    method: "POST",
+  });
+}
+
 // ---- Admin / audit log (Phase 6C) ----
 
 export interface AccessLogRow {
