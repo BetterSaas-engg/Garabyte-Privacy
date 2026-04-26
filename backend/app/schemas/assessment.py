@@ -70,6 +70,11 @@ class ResponseOut(BaseModel):
     note: Optional[str]
     evidence_url: Optional[str]
     answered_at: Optional[datetime]
+    # Phase 9: who answered this question. Distinct from the requester so
+    # the dashboard can show "answered by Sam (org admin)" or "by Maya
+    # (privacy lead)" — supports the multi-stakeholder narrative.
+    answered_by_id: Optional[int] = None
+    answered_by_email: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

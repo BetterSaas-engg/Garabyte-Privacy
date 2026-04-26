@@ -170,6 +170,9 @@ export interface ResponseOut {
   note: string | null;
   evidence_url: string | null;
   answered_at: string | null;
+  // Phase 9: attribution
+  answered_by_id: number | null;
+  answered_by_email: string | null;
 }
 
 export interface BulkResponsesResult {

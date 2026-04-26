@@ -422,8 +422,10 @@ def submit_responses(
 
     Rejects submission if the assessment is already completed.
 
-    Requires org_admin or section_contributor membership. Section contributor
-    dimension scoping (R&P C5) is enforced in Phase 5.
+    Section contributors (R&P C5) may only write to questions belonging to
+    dimensions explicitly listed in their membership.dimension_ids; the
+    submit fails fast on the first out-of-scope question rather than
+    silently dropping rows.
     """
     # Lazy import to avoid circular with main.py
     from ..main import RULES
@@ -432,19 +434,41 @@ def submit_responses(
     if assessment.status == "completed":
         raise HTTPException(400, "Assessment is already completed")
 
-    ensure_membership(
+    membership = ensure_membership(
         db, user, assessment.tenant_id,
         roles=_ASSESSMENT_WRITE_ROLES,
         request=request,
         action="assessment.write.check",
     )
 
-    known_qids = {q.id for d in RULES.dimensions for q in d.questions}
+    # Build a question_id -> dimension_id map for C5 scoping.
+    qid_to_dim = {q.id: d.id for d in RULES.dimensions for q in d.questions}
+    allowed_dims = (
+        set(membership.dimension_ids or [])
+        if membership.role == ROLE_SECTION_CONTRIBUTOR
+        else None
+    )
+
+    known_qids = set(qid_to_dim.keys())
     created, updated = 0, 0
 
     for r in payload.responses:
         if r.question_id not in known_qids:
             raise HTTPException(400, f"Unknown question ID: {r.question_id}")
+
+        # R&P C5 scoping: section contributors are confined to their
+        # assigned dimensions. Org admins / consultants / garabyte admins
+        # have allowed_dims == None and bypass the check.
+        if allowed_dims is not None:
+            dim = qid_to_dim[r.question_id]
+            if dim not in allowed_dims:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"You aren't assigned to dimension {dim}; "
+                        f"ask the org admin to add it to your section assignments."
+                    ),
+                )
 
         existing = db.query(Response).filter(
             Response.assessment_id == assessment_id,
@@ -458,6 +482,7 @@ def submit_responses(
             existing.note = r.note
             existing.evidence_url = r.evidence_url
             existing.answered_at = datetime.utcnow()
+            existing.answered_by_id = user.id
             updated += 1
         else:
             db.add(Response(
@@ -468,6 +493,7 @@ def submit_responses(
                 skip_reason=r.skip_reason,
                 note=r.note,
                 evidence_url=r.evidence_url,
+                answered_by_id=user.id,
             ))
             created += 1
 
@@ -598,7 +624,29 @@ def list_responses(
                action="assessment.responses.read",
                resource_kind="assessment", resource_id=a.id, ip=_ip(request))
     db.commit()
-    return a.responses
+
+    # Hydrate answered_by_email in a single batched query (avoids N+1
+    # while keeping ResponseOut a flat object the frontend can render
+    # directly).
+    answerer_ids = {r.answered_by_id for r in a.responses if r.answered_by_id}
+    emails = (
+        {u.id: u.email for u in db.query(User).filter(User.id.in_(answerer_ids)).all()}
+        if answerer_ids else {}
+    )
+    return [
+        ResponseOut(
+            question_id=r.question_id,
+            value=r.value,
+            skipped=r.skipped,
+            skip_reason=r.skip_reason,
+            note=r.note,
+            evidence_url=r.evidence_url,
+            answered_at=r.answered_at,
+            answered_by_id=r.answered_by_id,
+            answered_by_email=emails.get(r.answered_by_id),
+        )
+        for r in a.responses
+    ]
 
 
 @assessments_router.get(

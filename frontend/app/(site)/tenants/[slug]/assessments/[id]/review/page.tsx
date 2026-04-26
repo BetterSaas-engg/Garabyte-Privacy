@@ -121,8 +121,15 @@ export default function SubmissionReviewPage() {
     const totalAnswered = reviews.reduce((s, r) => s + r.answered, 0);
     const counts = { high: 0, low: 0, none: 0 } as Record<Confidence, number>;
     reviews.forEach((r) => { counts[r.confidence] += 1; });
-    return { total, totalAnswered, counts };
-  }, [reviews]);
+    // Phase 9: count distinct contributors so the review screen can say
+    // "answered by Maya, Jordan, and Sam" — turns the multi-stakeholder
+    // story from a backend fact into a customer-visible one.
+    const contributors = new Set<string>();
+    (responses ?? []).forEach((r) => {
+      if (r.answered_by_email) contributors.add(r.answered_by_email);
+    });
+    return { total, totalAnswered, counts, contributors: Array.from(contributors) };
+  }, [reviews, responses]);
 
   async function onSubmit() {
     setSubmitting(true);
@@ -211,6 +218,13 @@ export default function SubmissionReviewPage() {
               </>
             )}
           </p>
+          {summary.contributors.length > 0 && (
+            <p className="text-xs text-garabyte-ink-500 mt-1.5">
+              {summary.contributors.length === 1
+                ? `Answers attributed to ${summary.contributors[0]}.`
+                : `Answers attributed to ${summary.contributors.length} contributors: ${summary.contributors.join(", ")}.`}
+            </p>
+          )}
         </header>
 
         {/* Per-dimension confidence list */}

@@ -36,8 +36,20 @@ class Response(Base):
     evidence_url = Column(String(512), nullable=True)
     note = Column(Text, nullable=True)
     answered_at = Column(DateTime, default=datetime.utcnow)
+    # Phase 9 (audit M23): who actually answered this question. Distinct from
+    # the assessment's overall org_admin — multi-stakeholder assessments have
+    # different people answering different dimensions, and regulator-side
+    # defensibility hinges on being able to point at the human who attested
+    # to each answer. SET NULL on user delete so the audit trail survives a
+    # DSAR; the answered_at timestamp keeps the row interpretable.
+    answered_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     assessment = relationship("Assessment", back_populates="responses")
+    answered_by = relationship("User")
 
     def __repr__(self) -> str:
         state = "skipped" if self.skipped else f"v={self.value}"
