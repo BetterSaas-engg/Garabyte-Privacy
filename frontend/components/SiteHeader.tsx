@@ -8,20 +8,28 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { logout, whoami, type WhoAmI } from "@/lib/api";
 
 export function SiteHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const [me, setMe] = useState<WhoAmI | null>(null);
   const [checked, setChecked] = useState(false);
 
+  // Re-run on every route change. Otherwise the header keeps the
+  // pre-login state (me=null → "Sign in") after the user logs in,
+  // because Next's App Router doesn't remount the layout on
+  // intra-layout navigation. Same trick handles the post-logout
+  // case from any page that doesn't manually clear the state.
   useEffect(() => {
+    let cancelled = false;
     whoami()
-      .then(setMe)
-      .catch(() => setMe(null))
-      .finally(() => setChecked(true));
-  }, []);
+      .then((w) => { if (!cancelled) setMe(w); })
+      .catch(() => { if (!cancelled) setMe(null); })
+      .finally(() => { if (!cancelled) setChecked(true); });
+    return () => { cancelled = true; };
+  }, [pathname]);
 
   async function onSignOut() {
     try {

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/api";
+import { login, whoami } from "@/lib/api";
 import {
   AuthShell,
   ErrorBanner,
@@ -18,6 +18,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Bounce already-authed users to the dashboard. Otherwise a logged-in
+  // user who clicks "Sign in" thinking it's logout (or who lands here
+  // from a stale tab) gets a confusing "log in again" experience.
+  useEffect(() => {
+    whoami()
+      .then(() => {
+        router.replace("/");
+        router.refresh();
+      })
+      .catch(() => { /* not signed in — show the form */ });
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
