@@ -77,6 +77,12 @@ CI runs the same scripts on every PR. See [.github/workflows/ci.yml](.github/wor
 
 ## Status
 
-Under active development. The current state and roadmap are tracked outside this README; ask before assuming a feature is ready for production. The frontend is currently read-only — there is no questionnaire UI yet.
+Under active development. Phases 1–3 of the audit are complete:
+
+- ✅ **Engine + content corrections** (label drift, partial-completion confidence, half-up rounding, structured triggers, evidence pathway, versioning fields)
+- ✅ **Plumbing** (Alembic migrations, CI, evidence wired end-to-end, docs/privacy.md and docs/architecture.md)
+- ✅ **Auth + ownership** (httpOnly session cookies, RBAC per [docs/roles-and-permissions.md](docs/roles-and-permissions.md), rate limiting, signup / login / magic link / password reset / invitations, IDOR fix)
+
+A static UI mock of the consultant console is at [/consultant](frontend/app/consultant/). The customer-facing questionnaire UI (audit C0) is the next major piece; designs from the Claude Design bundle (Resume Dashboard, Question Screen, Submission Review) are still to be ported.
 
 See [docs/privacy.md](docs/privacy.md) for the product's own privacy posture.

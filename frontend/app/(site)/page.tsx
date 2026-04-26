@@ -2,9 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getTenants, getTenantHistory, isUnauthorized } from "@/lib/api";
+import {
+  getTenants,
+  getTenantHistory,
+  isUnauthorized,
+  whoami,
+} from "@/lib/api";
+import type { AuthMembership, WhoAmI } from "@/lib/api";
 import type { Tenant, TenantHistoryItem } from "@/lib/types";
 import { TenantCard } from "@/components/TenantCard";
+import { InviteModal } from "@/components/InviteModal";
 
 interface TenantWithHistory {
   tenant: Tenant;
@@ -15,11 +22,14 @@ export default function Home() {
   const router = useRouter();
   const [data, setData] = useState<TenantWithHistory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<WhoAmI | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
-        const tenants = await getTenants();
+        const [tenants, w] = await Promise.all([getTenants(), whoami()]);
+        setMe(w);
         const withHistory = await Promise.all(
           tenants.map(async (t) => ({
             tenant: t,
@@ -37,6 +47,12 @@ export default function Home() {
     }
     load();
   }, [router]);
+
+  const memberships: AuthMembership[] = me?.memberships ?? [];
+  const isGarabyteAdmin = memberships.some((m) => m.role === "garabyte_admin");
+  const canInvite = memberships.some(
+    (m) => m.role === "org_admin" || m.role === "garabyte_admin",
+  );
 
   return (
     <main className="min-h-[calc(100vh-73px)] px-6 py-12">
@@ -61,9 +77,19 @@ export default function Home() {
             <h2 className="text-h2 text-garabyte-primary-800">
               Client organizations
             </h2>
-            <p className="text-sm text-garabyte-ink-500">
-              {data ? `${data.length} active` : ""}
-            </p>
+            <div className="flex items-baseline gap-4">
+              <p className="text-sm text-garabyte-ink-500">
+                {data ? `${data.length} active` : ""}
+              </p>
+              {canInvite && (
+                <button
+                  onClick={() => setInviteOpen(true)}
+                  className="text-sm px-3 py-1.5 rounded-md bg-garabyte-primary-500 text-white hover:bg-garabyte-primary-600 transition-colors"
+                >
+                  Invite colleague
+                </button>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -106,6 +132,13 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      <InviteModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        memberships={memberships}
+        isGarabyteAdmin={isGarabyteAdmin}
+      />
     </main>
   );
 }

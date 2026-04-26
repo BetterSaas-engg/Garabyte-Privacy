@@ -254,3 +254,22 @@ export function acceptInvitation(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export interface InvitationCreateResult {
+  email: string;
+  org_id: number;
+  role: string;
+  expires_in_days: number;
+}
+
+export function createInvitation(payload: {
+  email: string;
+  org_id: number;
+  role: string;
+  dimension_ids?: string[];
+}): Promise<InvitationCreateResult> {
+  return apiRequest<InvitationCreateResult>("/auth/invitations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
