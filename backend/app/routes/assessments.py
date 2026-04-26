@@ -62,11 +62,121 @@ _FINDING_EDIT_ROLES = (ROLE_CONSULTANT,)
 from ..services.scoring import score_assessment
 
 
-# Three routers: tenants for creation, assessments for the lifecycle, and
-# findings for top-level finding-id-scoped paths (annotations).
+# Four routers: tenants for creation, assessments for the lifecycle,
+# findings for top-level finding-id-scoped paths (annotations), and
+# consultant for the cross-tenant engagement listing (Phase 6A).
 tenants_router = APIRouter(prefix="/tenants", tags=["assessments"])
 assessments_router = APIRouter(prefix="/assessments", tags=["assessments"])
 findings_router = APIRouter(prefix="/findings", tags=["findings"])
+consultant_router = APIRouter(prefix="/consultant", tags=["consultant"])
+
+
+class EngagementOut(BaseModel):
+    """One row in the consultant's engagement list."""
+    tenant_id: int
+    tenant_slug: str
+    tenant_name: str
+    tenant_sector: str
+    tenant_jurisdiction: str
+    tenant_employee_count: Optional[int] = None
+
+    assessment_id: int
+    assessment_label: Optional[str] = None
+    assessment_status: str
+    overall_score: Optional[float] = None
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+
+    # Counts driven by the consultant's working surface
+    findings_total: int
+    findings_unreviewed: int
+
+
+def _engagement_counts(db: Session, assessment_id: int) -> tuple[int, int]:
+    """Return (total findings, findings with no annotation yet)."""
+    findings = (
+        db.query(Finding)
+        .filter(Finding.assessment_id == assessment_id)
+        .all()
+    )
+    total = len(findings)
+    unreviewed = sum(1 for f in findings if not f.annotations)
+    return total, unreviewed
+
+
+@consultant_router.get("/engagements", response_model=list[EngagementOut])
+def list_engagements(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List assessments visible to the current user as a consultant or
+    Garabyte admin. Other roles see an empty list (use /tenants for the
+    customer-side dashboard instead).
+
+    Each row carries the bits the consultant home needs to triage:
+    score, completed-at, published-at, and finding counts. Sorted so
+    "needs the most attention" lands at the top: newest unpublished
+    submissions first, then in-progress, then published last.
+    """
+    is_garabyte_admin = any(m.role == ROLE_GARABYTE_ADMIN for m in user.memberships)
+    if is_garabyte_admin:
+        # Garabyte admin sees every tenant's assessments (R&P C4 elevation;
+        # the /membership.check log captures the access).
+        rows = (
+            db.query(Assessment, Tenant)
+            .join(Tenant, Tenant.id == Assessment.tenant_id)
+            .order_by(
+                Assessment.completed_at.desc().nullslast(),
+                Assessment.started_at.desc(),
+            )
+            .all()
+        )
+    else:
+        consultant_org_ids = [
+            m.org_id for m in user.memberships if m.role == ROLE_CONSULTANT
+        ]
+        if not consultant_org_ids:
+            return []
+        rows = (
+            db.query(Assessment, Tenant)
+            .join(Tenant, Tenant.id == Assessment.tenant_id)
+            .filter(Assessment.tenant_id.in_(consultant_org_ids))
+            .order_by(
+                Assessment.completed_at.desc().nullslast(),
+                Assessment.started_at.desc(),
+            )
+            .all()
+        )
+
+    log_access(db, user_id=user.id, action="consultant.engagements.list",
+               context={"count": len(rows), "garabyte_admin": is_garabyte_admin},
+               ip=_ip(request))
+    db.commit()
+
+    out: list[EngagementOut] = []
+    for a, t in rows:
+        total, unreviewed = _engagement_counts(db, a.id)
+        out.append(EngagementOut(
+            tenant_id=t.id,
+            tenant_slug=t.slug,
+            tenant_name=t.name,
+            tenant_sector=t.sector,
+            tenant_jurisdiction=t.jurisdiction,
+            tenant_employee_count=t.employee_count,
+            assessment_id=a.id,
+            assessment_label=a.label,
+            assessment_status=a.status,
+            overall_score=a.overall_score,
+            started_at=a.started_at,
+            completed_at=a.completed_at,
+            published_at=a.published_at,
+            findings_total=total,
+            findings_unreviewed=unreviewed,
+        ))
+    return out
 
 
 # Roles per R&P (loose for Phase 3; tighter scoping is Phase 5 work):

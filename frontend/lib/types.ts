@@ -11,6 +11,7 @@ export interface Tenant {
   name: string;
   sector: "utility" | "healthcare" | "telecom" | "other";
   jurisdiction: string;
+  jurisdiction_codes: string[] | null;
   employee_count: number | null;
   is_demo: number;
   created_at: string;
@@ -21,8 +22,25 @@ export interface TenantCreate {
   name: string;
   sector: "utility" | "healthcare" | "telecom" | "other";
   jurisdiction?: string;
+  jurisdiction_codes?: string[];
   employee_count?: number;
 }
+
+// ISO-style jurisdiction codes the platform recognizes today.
+// Keep this in sync with backend/app/services/jurisdictions.py
+// KNOWN_JURISDICTION_CODES.
+export const JURISDICTION_CODES: { code: string; label: string }[] = [
+  { code: "CA",     label: "Canada (federal)" },
+  { code: "CA-ON",  label: "Ontario" },
+  { code: "CA-QC",  label: "Quebec" },
+  { code: "CA-BC",  label: "British Columbia" },
+  { code: "CA-AB",  label: "Alberta" },
+  { code: "EU",     label: "European Union" },
+  { code: "US",     label: "United States (federal)" },
+  { code: "US-CA",  label: "California" },
+  { code: "US-NY",  label: "New York" },
+  { code: "UK",     label: "United Kingdom" },
+];
 
 export interface TenantHistoryItem {
   assessment_id: number;

@@ -184,6 +184,30 @@ export function publishAssessment(
   });
 }
 
+// ---- Consultant engagements (Phase 6A) ----
+
+export interface Engagement {
+  tenant_id: number;
+  tenant_slug: string;
+  tenant_name: string;
+  tenant_sector: string;
+  tenant_jurisdiction: string;
+  tenant_employee_count: number | null;
+  assessment_id: number;
+  assessment_label: string | null;
+  assessment_status: "in_progress" | "completed";
+  overall_score: number | null;
+  started_at: string;
+  completed_at: string | null;
+  published_at: string | null;
+  findings_total: number;
+  findings_unreviewed: number;
+}
+
+export function getConsultantEngagements(): Promise<Engagement[]> {
+  return apiRequest<Engagement[]>("/consultant/engagements");
+}
+
 export function scoreAssessment(
   assessmentId: number,
 ): Promise<AssessmentResultOut> {
@@ -323,4 +347,37 @@ export function createInvitation(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ---- Admin / audit log (Phase 6C) ----
+
+export interface AccessLogRow {
+  id: number;
+  at: string;
+  user_id: number | null;
+  user_email: string | null;
+  org_id: number | null;
+  org_slug: string | null;
+  action: string;
+  resource_kind: string | null;
+  resource_id: number | null;
+  ip: string | null;
+  context: Record<string, unknown> | null;
+}
+
+export function getAccessLog(params: {
+  limit?: number;
+  offset?: number;
+  org_id?: number;
+  user_id?: number;
+  action?: string;
+} = {}): Promise<AccessLogRow[]> {
+  const qs = new URLSearchParams();
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  if (params.org_id !== undefined) qs.set("org_id", String(params.org_id));
+  if (params.user_id !== undefined) qs.set("user_id", String(params.user_id));
+  if (params.action) qs.set("action", params.action);
+  const q = qs.toString();
+  return apiRequest<AccessLogRow[]>(`/admin/access-log${q ? `?${q}` : ""}`);
 }

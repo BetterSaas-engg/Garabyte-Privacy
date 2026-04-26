@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createTenant, isUnauthorized, whoami } from "@/lib/api";
+import { JURISDICTION_CODES } from "@/lib/types";
 
 const SECTORS = [
   { value: "utility",     label: "Utility" },
@@ -31,9 +32,16 @@ export default function NewTenantPage() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [sector, setSector] = useState<Sector>("other");
   const [jurisdiction, setJurisdiction] = useState("Canada");
+  const [jurisdictionCodes, setJurisdictionCodes] = useState<string[]>(["CA"]);
   const [employees, setEmployees] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function toggleCode(code: string) {
+    setJurisdictionCodes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  }
 
   // Garabyte admin only — see if the user qualifies before showing the form.
   useEffect(() => {
@@ -66,6 +74,7 @@ export default function NewTenantPage() {
         slug,
         sector,
         jurisdiction: jurisdiction.trim() || undefined,
+        jurisdiction_codes: jurisdictionCodes.length > 0 ? jurisdictionCodes : undefined,
         employee_count: employees ? Number(employees) : undefined,
       });
       router.push(`/tenants/${tenant.slug}`);
@@ -136,8 +145,31 @@ export default function NewTenantPage() {
           </select>
         </Field>
 
-        <Field label="Jurisdiction">
+        <Field label="Jurisdiction" sub="Free-text label shown on the report">
           <Input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} maxLength={128} />
+        </Field>
+
+        <Field label="Jurisdiction codes" sub="Filters which regulations are cited in findings">
+          <div className="flex flex-wrap gap-2">
+            {JURISDICTION_CODES.map((j) => {
+              const active = jurisdictionCodes.includes(j.code);
+              return (
+                <button
+                  key={j.code}
+                  type="button"
+                  onClick={() => toggleCode(j.code)}
+                  className={
+                    "text-xs px-2.5 py-1 rounded-md border transition-colors " +
+                    (active
+                      ? "bg-garabyte-primary-500 text-white border-garabyte-primary-500"
+                      : "bg-white text-garabyte-ink-700 border-garabyte-ink-100 hover:border-garabyte-ink-300")
+                  }
+                >
+                  {j.code} <span className={active ? "opacity-80" : "text-garabyte-ink-300"}>· {j.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </Field>
 
         <Field label="Employee count" sub="Optional">

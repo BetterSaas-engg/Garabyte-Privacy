@@ -12,6 +12,10 @@ class TenantCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     sector: str = Field(..., pattern=r"^(utility|healthcare|telecom|other)$")
     jurisdiction: str = "Canada"
+    # ISO-style jurisdiction codes for regulatory citation filtering
+    # (audit M22). e.g. ["CA", "CA-QC"] for a Quebec-based Canadian
+    # tenant. Empty/omitted means "show every regulation in citations."
+    jurisdiction_codes: Optional[list[str]] = Field(None, max_length=20)
     employee_count: Optional[int] = Field(None, ge=1, le=1_000_000)
 
 
@@ -22,6 +26,7 @@ class TenantOut(BaseModel):
     name: str
     sector: str
     jurisdiction: str
+    jurisdiction_codes: Optional[list[str]] = None
     employee_count: Optional[int] = None
     is_demo: int
     created_at: datetime

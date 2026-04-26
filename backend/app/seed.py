@@ -37,6 +37,7 @@ SYNTHETIC_PROFILES = {
         "name": "Northwind Utilities",
         "sector": "utility",
         "jurisdiction": "Ontario & Quebec, Canada",
+        "jurisdiction_codes": ["CA", "CA-ON", "CA-QC"],
         "employee_count": 450,
         "response_pattern": {
             # D1 Governance: strong (avg 2.8) - regulators audit utilities
@@ -62,6 +63,7 @@ SYNTHETIC_PROFILES = {
         "name": "Meridian Health Network",
         "sector": "healthcare",
         "jurisdiction": "Ontario, Canada",
+        "jurisdiction_codes": ["CA", "CA-ON"],
         "employee_count": 1200,
         "response_pattern": {
             # D1 Governance: strong (avg 3.2)
@@ -87,6 +89,7 @@ SYNTHETIC_PROFILES = {
         "name": "Cascade Telecommunications",
         "sector": "telecom",
         "jurisdiction": "Canada (national)",
+        "jurisdiction_codes": ["CA", "CA-ON", "CA-QC", "CA-BC", "CA-AB"],
         "employee_count": 3500,
         "response_pattern": {
             # D1 Governance: very strong (avg 3.8)
@@ -146,6 +149,7 @@ def seed_tenant(
         name=profile["name"],
         sector=profile["sector"],
         jurisdiction=profile["jurisdiction"],
+        jurisdiction_codes=profile.get("jurisdiction_codes"),
         employee_count=profile["employee_count"],
         is_demo=1,
     )
