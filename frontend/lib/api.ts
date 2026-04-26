@@ -349,6 +349,46 @@ export function createInvitation(payload: {
   });
 }
 
+// ---- Evidence file uploads (Phase 10) ----
+
+export interface EvidenceFile {
+  id: number;
+  response_id: number;
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  uploaded_by_id: number | null;
+}
+
+/**
+ * Upload an evidence file against a Response. Returns the EvidenceFile row;
+ * the corresponding Response.evidence_url is set server-side to /evidence/{id}.
+ */
+export function uploadEvidence(responseId: number, file: File): Promise<EvidenceFile> {
+  const fd = new FormData();
+  fd.append("file", file);
+  // Don't go through apiRequest — it sets Content-Type: application/json,
+  // which would mangle the multipart body.
+  return fetch(`${API_URL}/responses/${responseId}/evidence`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  }).then(async (r) => {
+    if (!r.ok) {
+      const text = await r.text();
+      const err = new Error(text || r.statusText) as ApiError;
+      err.status = r.status;
+      throw err;
+    }
+    return r.json();
+  });
+}
+
+export function deleteEvidence(evidenceId: number): Promise<void> {
+  return apiRequest<void>(`/evidence/${evidenceId}`, { method: "DELETE" });
+}
+
 // ---- Share links (Phase 8 / R&P C21) ----
 
 export interface ShareLink {

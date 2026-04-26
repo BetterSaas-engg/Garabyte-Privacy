@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     email_from: str = "Garabyte Privacy <no-reply@garabyte.example>"
     email_reply_to: str = ""
 
+    # ---- Evidence file storage (Phase 10) --------------------------------
+    # Local-disk path where uploaded evidence files are persisted. Defaults
+    # to backend/evidence_files/ relative to the backend root. Production
+    # should swap the storage backend (services/evidence_storage.py) for
+    # an object store rather than mounting a giant volume — but the local
+    # backend is fine for dev and small deployments.
+    evidence_storage_dir: str = "./evidence_files"
+    # Hard caps enforced at upload time.
+    evidence_max_bytes: int = 10 * 1024 * 1024  # 10 MB
+
     # DATABASE_URL is read directly by app/database.py, not here.
 
     @property

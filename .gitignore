@@ -16,6 +16,9 @@ build/
 *.sqlite
 *.sqlite3
 
+# Local evidence file storage (Phase 10)
+backend/evidence_files/
+
 # Environment
 .env
 .env.local

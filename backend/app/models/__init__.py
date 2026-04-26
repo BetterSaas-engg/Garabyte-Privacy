@@ -3,6 +3,7 @@ from .base import Base
 from .tenant import Tenant
 from .assessment import Assessment
 from .response import Response
+from .evidence import EvidenceFile
 from .finding import (
     AssessmentPublication,
     Finding,
@@ -42,6 +43,7 @@ __all__ = [
     "Assessment",
     "Response",
     "AssessmentPublication",
+    "EvidenceFile",
     "Finding",
     "FindingAnnotation",
     "ShareLink",

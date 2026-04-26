@@ -63,6 +63,9 @@ class ResponseSubmit(BaseModel):
 
 class ResponseOut(BaseModel):
     """Response shape for GET /assessments/{id}/responses."""
+    # Phase 10: surfacing the row id so the evidence-upload endpoint can
+    # be called against it without a separate lookup round-trip.
+    id: int
     question_id: str
     value: Optional[int]
     skipped: bool

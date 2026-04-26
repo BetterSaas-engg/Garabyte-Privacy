@@ -635,6 +635,7 @@ def list_responses(
     )
     return [
         ResponseOut(
+            id=r.id,
             question_id=r.question_id,
             value=r.value,
             skipped=r.skipped,

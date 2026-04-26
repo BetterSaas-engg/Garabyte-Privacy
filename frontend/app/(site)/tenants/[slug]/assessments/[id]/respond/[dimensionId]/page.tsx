@@ -9,6 +9,7 @@ import {
   getRules,
   isUnauthorized,
   submitResponses,
+  uploadEvidence,
 } from "@/lib/api";
 import type {
   Assessment,
@@ -465,6 +466,11 @@ export default function QuestionScreenPage() {
                 maxLength={512}
                 className="w-full h-9 px-3 rounded-md text-sm bg-white text-garabyte-ink-900 placeholder:text-garabyte-ink-300 border border-garabyte-ink-100 hover:border-garabyte-ink-300 focus:border-garabyte-primary-500 focus:ring-2 focus:ring-garabyte-primary-500/20 outline-none transition-colors"
               />
+              <EvidenceUploader
+                questionId={question.id}
+                assessmentId={assessmentId}
+                onUploaded={(serverUrl) => setEvidenceUrl(serverUrl)}
+              />
             </div>
           )}
 
@@ -534,5 +540,71 @@ export default function QuestionScreenPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Wraps the file <input> for evidence upload. Looks up the persisted
+ * Response.id from the loaded responses so the upload endpoint has a
+ * concrete row to attach to. If the answer hasn't been saved yet, the
+ * uploader prompts the customer to answer first — we deliberately don't
+ * upload-then-create-row because the row tracks the answered_by_id
+ * audit pointer.
+ */
+function EvidenceUploader({
+  questionId,
+  assessmentId,
+  onUploaded,
+}: {
+  questionId: string;
+  assessmentId: number;
+  onUploaded: (serverUrl: string) => void;
+}) {
+  const [responses, setResponses] = useState<ResponseOut[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAssessmentResponses(assessmentId).then(setResponses).catch(() => undefined);
+  }, [assessmentId]);
+
+  const responseId = responses?.find((r) => r.question_id === questionId)?.id;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !responseId) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const ev = await uploadEvidence(responseId, file);
+      onUploaded(`/evidence/${ev.id}`);
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : String(x));
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={onPick}
+        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,image/png,image/jpeg,image/gif,image/webp"
+        disabled={!responseId || busy}
+        className="text-xs"
+      />
+      <p className="text-[11px] text-garabyte-ink-500 mt-1">
+        {!responseId
+          ? "Pick an answer above first; the upload attaches to a saved response."
+          : busy
+            ? "Uploading…"
+            : "Or upload a file directly (PDF, Office, image; up to 10 MB)."}
+      </p>
+      {err && <p className="text-[11px] text-garabyte-status-critical mt-1">{err}</p>}
+    </div>
   );
 }

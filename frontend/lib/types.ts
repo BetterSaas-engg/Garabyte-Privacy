@@ -163,6 +163,7 @@ export interface ResponseSubmit {
 }
 
 export interface ResponseOut {
+  id: number;
   question_id: string;
   value: number | null;
   skipped: boolean;
