@@ -47,8 +47,22 @@ export interface Assessment {
 
 export interface ResponseSubmit {
   question_id: string;
-  value: number;
+  // null only when skipped is true (audit M21)
+  value: number | null;
+  skipped?: boolean;
+  skip_reason?: string;
   note?: string;
+  evidence_url?: string;
+}
+
+export interface ResponseOut {
+  question_id: string;
+  value: number | null;
+  skipped: boolean;
+  skip_reason: string | null;
+  note: string | null;
+  evidence_url: string | null;
+  answered_at: string | null;
 }
 
 export interface BulkResponsesResult {
@@ -66,6 +80,10 @@ export interface DimensionScore {
   weight: number;
   question_count: number;
   answered_count: number;
+  // Backend now returns these (audit C4, M14, H9). Optional on the type
+  // for any older stored result_json blobs that pre-date the change.
+  confidence?: "high" | "low" | "none";
+  evidence_coverage?: number;
 }
 
 export interface GapFinding {
@@ -85,6 +103,13 @@ export interface AssessmentScoreResult {
   overall_maturity_label: string;
   dimension_scores: DimensionScore[];
   gaps: GapFinding[];
+  // Versioning + provenance fields added in Phase 2 (audit M18). Optional
+  // for the same back-compat reason as DimensionScore.
+  schema_version?: number;
+  rules_version?: string;
+  assessed_at?: string;
+  // Fraction of dimensions with usable signal (audit C4).
+  coverage?: number;
 }
 
 export interface AssessmentResultOut {
@@ -102,6 +127,7 @@ export interface QuestionOption {
 export interface Question {
   id: string;
   text: string;
+  weight: number;
   options: QuestionOption[];
   evidence_prompt: string | null;
   regulatory_note: string | null;

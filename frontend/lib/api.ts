@@ -17,6 +17,7 @@ import type {
   TenantHistoryItem,
   Assessment,
   ResponseSubmit,
+  ResponseOut,
   BulkResponsesResult,
   AssessmentResultOut,
   RulesLibrary,
@@ -131,6 +132,12 @@ export function submitResponses(
       body: JSON.stringify({ responses }),
     },
   );
+}
+
+export function getAssessmentResponses(
+  assessmentId: number,
+): Promise<ResponseOut[]> {
+  return apiRequest<ResponseOut[]>(`/assessments/${assessmentId}/responses`);
 }
 
 export function scoreAssessment(

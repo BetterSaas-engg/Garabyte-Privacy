@@ -24,6 +24,7 @@ from ..schemas import (
     AssessmentResultOut,
     BulkResponsesSubmit,
     BulkResponsesResult,
+    ResponseOut,
 )
 from ..services.scoring import score_assessment
 
@@ -165,6 +166,8 @@ def submit_responses(
 
         if existing:
             existing.value = r.value
+            existing.skipped = r.skipped
+            existing.skip_reason = r.skip_reason
             existing.note = r.note
             existing.evidence_url = r.evidence_url
             existing.answered_at = datetime.utcnow()
@@ -174,6 +177,8 @@ def submit_responses(
                 assessment_id=assessment_id,
                 question_id=r.question_id,
                 value=r.value,
+                skipped=r.skipped,
+                skip_reason=r.skip_reason,
                 note=r.note,
                 evidence_url=r.evidence_url,
             ))
@@ -223,12 +228,20 @@ def finalize_assessment(
             result=assessment.result_json,
         )
 
-    responses = {r.question_id: r.value for r in assessment.responses}
+    # Skipped or value-less rows are excluded from scoring -- they signal
+    # "no data" the same way a missing row does (audit M21).
+    responses = {
+        r.question_id: r.value
+        for r in assessment.responses
+        if r.value is not None and not r.skipped
+    }
     if not responses:
         raise HTTPException(400, "No responses submitted yet")
 
     evidence_provided = {
-        r.question_id: bool(r.evidence_url) for r in assessment.responses
+        r.question_id: bool(r.evidence_url)
+        for r in assessment.responses
+        if r.value is not None and not r.skipped
     }
     result = score_assessment(RULES, responses, evidence_provided)
     result_dict = result.to_dict()
@@ -246,6 +259,38 @@ def finalize_assessment(
     db.refresh(assessment)
 
     return AssessmentResultOut(assessment=assessment, result=result_dict)
+
+
+@assessments_router.get(
+    "/{assessment_id}/responses",
+    response_model=list[ResponseOut],
+)
+def list_responses(
+    assessment_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return every persisted response for the assessment. The Resume
+    Dashboard uses this to compute per-dimension progress (answered /
+    skipped / untouched) and the Question Screen uses it to preload
+    existing answers when the user resumes mid-flow.
+
+    Same membership requirement as reading the assessment itself.
+    """
+    a = _load_assessment_or_404(db, assessment_id)
+    ensure_membership(
+        db, user, a.tenant_id,
+        roles=_ASSESSMENT_READ_ROLES,
+        request=request,
+        action="assessment.responses.read.check",
+    )
+    log_access(db, user_id=user.id, org_id=a.tenant_id,
+               action="assessment.responses.read",
+               resource_kind="assessment", resource_id=a.id, ip=_ip(request))
+    db.commit()
+    return a.responses
 
 
 @assessments_router.get(

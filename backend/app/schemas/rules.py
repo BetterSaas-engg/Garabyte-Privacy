@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class QuestionSchema(BaseModel):
     id: str
     text: str
+    weight: float
     options: list[dict[str, Any]]
     evidence_prompt: Optional[str] = None
     regulatory_note: Optional[str] = None

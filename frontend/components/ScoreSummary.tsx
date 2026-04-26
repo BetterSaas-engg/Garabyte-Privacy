@@ -7,6 +7,10 @@ interface ScoreSummaryProps {
   overallScore: number;
   maturityLabel: string;
   previousScore: number | null;
+  // Phase 2/4 additions: provenance + coverage from the result_json
+  coverage?: number;
+  assessedAt?: string;
+  rulesVersion?: string;
 }
 
 export function ScoreSummary({
@@ -14,14 +18,32 @@ export function ScoreSummary({
   overallScore,
   maturityLabel,
   previousScore,
+  coverage,
+  assessedAt,
+  rulesVersion,
 }: ScoreSummaryProps) {
   const delta = previousScore != null ? overallScore - previousScore : null;
+  const partial = typeof coverage === "number" && coverage < 1;
 
   return (
     <div className="bg-white rounded-xl shadow-card p-8">
-      <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium mb-6">
-        {assessmentLabel ?? "Current assessment"}
-      </p>
+      <div className="flex items-baseline justify-between mb-6">
+        <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium">
+          {assessmentLabel ?? "Current assessment"}
+        </p>
+        {assessedAt && (
+          <p className="text-xs text-garabyte-ink-500">
+            Scored {new Date(assessedAt).toLocaleDateString("en-CA")}
+            {rulesVersion && ` · rules v${rulesVersion.slice(0, 7)}`}
+          </p>
+        )}
+      </div>
+
+      {partial && (
+        <div className="rounded-md bg-garabyte-status-high/10 border border-garabyte-status-high/20 px-3 py-2 text-xs text-garabyte-status-high mb-4">
+          This score reflects {Math.round((coverage as number) * 100)}% of the assessment — some dimensions had insufficient data and were excluded.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_auto] gap-8 items-center">
         {/* Score dots + numeric */}

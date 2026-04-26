@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import type { AuthMembership, WhoAmI } from "@/lib/api";
 import type { Tenant, TenantHistoryItem } from "@/lib/types";
+import Link from "next/link";
 import { TenantCard } from "@/components/TenantCard";
 import { InviteModal } from "@/components/InviteModal";
 
@@ -77,10 +78,18 @@ export default function Home() {
             <h2 className="text-h2 text-garabyte-primary-800">
               Client organizations
             </h2>
-            <div className="flex items-baseline gap-4">
+            <div className="flex items-baseline gap-3">
               <p className="text-sm text-garabyte-ink-500">
                 {data ? `${data.length} active` : ""}
               </p>
+              {isGarabyteAdmin && (
+                <Link
+                  href="/tenants/new"
+                  className="text-sm px-3 py-1.5 rounded-md border border-garabyte-ink-100 hover:bg-garabyte-cream-100 text-garabyte-primary-700 transition-colors"
+                >
+                  Add organization
+                </Link>
+              )}
               {canInvite && (
                 <button
                   onClick={() => setInviteOpen(true)}

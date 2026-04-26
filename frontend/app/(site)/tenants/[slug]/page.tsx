@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  getAssessmentResult,
   getTenant,
   getTenantHistory,
-  getAssessmentResult,
   isUnauthorized,
+  whoami,
 } from "@/lib/api";
-import { useRouter } from "next/navigation";
 import type {
+  AssessmentResultOut,
   Tenant,
   TenantHistoryItem,
-  AssessmentResultOut,
 } from "@/lib/types";
 import { ScoreSummary } from "@/components/ScoreSummary";
 import { DimensionGrid } from "@/components/DimensionGrid";
@@ -25,25 +26,33 @@ export default function TenantDashboard({
   params: { slug: string };
 }) {
   const { slug } = params;
+  const router = useRouter();
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [history, setHistory] = useState<TenantHistoryItem[] | null>(null);
   const [latestResult, setLatestResult] = useState<AssessmentResultOut | null>(null);
+  const [canStart, setCanStart] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     async function load() {
       try {
-        const [t, h] = await Promise.all([
+        const [t, h, w] = await Promise.all([
           getTenant(slug),
           getTenantHistory(slug),
+          whoami(),
         ]);
         setTenant(t);
         document.title = `${t.name} — Garabyte Privacy Health Check`;
         setHistory(h);
 
-        // Fetch the latest completed assessment's full result
+        // Org admin (or Garabyte admin) can start a new assessment.
+        const isGarabyteAdmin = w.memberships.some((m) => m.role === "garabyte_admin");
+        const isOrgAdmin = w.memberships.some(
+          (m) => m.org_id === t.id && m.role === "org_admin",
+        );
+        setCanStart(isGarabyteAdmin || isOrgAdmin);
+
         if (h.length > 0) {
           const latest = h[h.length - 1];
           const result = await getAssessmentResult(latest.assessment_id);
@@ -80,7 +89,7 @@ export default function TenantDashboard({
     );
   }
 
-  if (!tenant || !history || !latestResult) {
+  if (!tenant || !history) {
     return (
       <main className="min-h-[calc(100vh-73px)] px-6 py-16">
         <div className="max-w-5xl mx-auto">
@@ -109,7 +118,7 @@ export default function TenantDashboard({
   return (
     <main className="min-h-[calc(100vh-73px)] px-6 py-12">
       <div className="max-w-5xl mx-auto space-y-10">
-        {/* Breadcrumb */}
+        {/* Breadcrumb + actions */}
         <div>
           <Link
             href="/"
@@ -117,65 +126,94 @@ export default function TenantDashboard({
           >
             ← All organizations
           </Link>
-          <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium mb-2">
-            {tenant.sector} · {tenant.jurisdiction}
-            {tenant.employee_count && ` · ${tenant.employee_count.toLocaleString()} employees`}
-          </p>
-          <h1 className="text-h1 text-garabyte-primary-800">
-            {tenant.name}
-          </h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium mb-2">
+                {tenant.sector} · {tenant.jurisdiction}
+                {tenant.employee_count && ` · ${tenant.employee_count.toLocaleString()} employees`}
+              </p>
+              <h1 className="text-h1 text-garabyte-primary-800">
+                {tenant.name}
+              </h1>
+            </div>
+            {canStart && (
+              <Link
+                href={`/tenants/${slug}/assessments/new`}
+                className="text-sm px-4 py-2 rounded-md bg-garabyte-primary-500 text-white hover:bg-garabyte-primary-600 transition-colors flex-shrink-0"
+              >
+                Start new assessment
+              </Link>
+            )}
+          </div>
         </div>
 
-        {/* Section 1: score summary */}
-        <ScoreSummary
-          assessmentLabel={latestResult.assessment.label}
-          overallScore={latestResult.result.overall_score}
-          maturityLabel={latestResult.result.overall_maturity_label}
-          previousScore={previousScore}
-        />
-
-        {/* Section 2: dimension grid */}
-        <section>
-          <div className="flex items-baseline justify-between mb-5">
-            <h2 className="text-h2 text-garabyte-primary-800">
-              Dimension breakdown
-            </h2>
-            <p className="text-sm text-garabyte-ink-500">
-              {latestResult.result.dimension_scores.length} dimensions scored
+        {/* No completed assessments yet — empty state */}
+        {!latestResult && (
+          <div className="rounded-xl bg-white shadow-soft border border-garabyte-ink-100 p-8 text-center">
+            <p className="text-h3 text-garabyte-primary-800 mb-2">
+              No completed assessments yet
             </p>
-          </div>
-          <DimensionGrid
-            dimensionScores={latestResult.result.dimension_scores}
-          />
-        </section>
-
-        {/* Section 3: gap findings */}
-        <section>
-          <div className="flex items-baseline justify-between mb-5">
-            <h2 className="text-h2 text-garabyte-primary-800">
-              Prioritized gaps
-            </h2>
-            <p className="text-sm text-garabyte-ink-500">
-              {latestResult.result.gaps.length} findings · sorted by severity
+            <p className="text-sm text-garabyte-ink-700 max-w-md mx-auto mb-5">
+              Start the first one to score this organization across the eight privacy dimensions and produce a prioritized gap report.
             </p>
+            {canStart ? (
+              <Link
+                href={`/tenants/${slug}/assessments/new`}
+                className="text-sm px-4 py-2 rounded-md bg-garabyte-primary-500 text-white hover:bg-garabyte-primary-600 transition-colors inline-block"
+              >
+                Start the first assessment
+              </Link>
+            ) : (
+              <p className="text-xs text-garabyte-ink-500">
+                Ask your org admin to start the first assessment.
+              </p>
+            )}
           </div>
-          <div className="space-y-3">
-            {latestResult.result.gaps.map((gap, i) => (
-              <GapFindingCard
-                key={`${gap.dimension_id}-${i}`}
-                gap={gap}
-              />
-            ))}
-          </div>
-        </section>
+        )}
 
-        {/* Section 4: assessment history */}
-        <section>
-          <h2 className="text-h2 text-garabyte-primary-800 mb-5">
-            Assessment history
-          </h2>
-          <AssessmentHistory history={history} />
-        </section>
+        {/* Score summary, dimension grid, gaps, history — only when there's a completed assessment */}
+        {latestResult && (
+          <>
+            <ScoreSummary
+              assessmentLabel={latestResult.assessment.label}
+              overallScore={latestResult.result.overall_score}
+              maturityLabel={latestResult.result.overall_maturity_label}
+              previousScore={previousScore}
+              coverage={latestResult.result.coverage}
+              assessedAt={latestResult.result.assessed_at}
+              rulesVersion={latestResult.result.rules_version}
+            />
+
+            <section>
+              <div className="flex items-baseline justify-between mb-5">
+                <h2 className="text-h2 text-garabyte-primary-800">Dimension breakdown</h2>
+                <p className="text-sm text-garabyte-ink-500">
+                  {latestResult.result.dimension_scores.length} dimensions scored
+                </p>
+              </div>
+              <DimensionGrid dimensionScores={latestResult.result.dimension_scores} />
+            </section>
+
+            <section>
+              <div className="flex items-baseline justify-between mb-5">
+                <h2 className="text-h2 text-garabyte-primary-800">Prioritized gaps</h2>
+                <p className="text-sm text-garabyte-ink-500">
+                  {latestResult.result.gaps.length} findings · sorted by severity
+                </p>
+              </div>
+              <div className="space-y-3">
+                {latestResult.result.gaps.map((gap, i) => (
+                  <GapFindingCard key={`${gap.dimension_id}-${i}`} gap={gap} />
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-h2 text-garabyte-primary-800 mb-5">Assessment history</h2>
+              <AssessmentHistory history={history} />
+            </section>
+          </>
+        )}
       </div>
     </main>
   );

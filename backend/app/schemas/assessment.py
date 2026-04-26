@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AssessmentCreate(BaseModel):
@@ -26,9 +26,16 @@ class AssessmentOut(BaseModel):
 
 
 class ResponseSubmit(BaseModel):
-    """A single question response in a bulk submit."""
+    """
+    A single question response in a bulk submit. Either:
+      - value is in [0..4] (answered), OR
+      - skipped is True and value is None (explicitly skipped, M21)
+    Both states overwrite any existing row for the same question.
+    """
     question_id: str = Field(..., min_length=1, max_length=32)
-    value: int = Field(..., ge=0, le=4)
+    value: Optional[int] = Field(None, ge=0, le=4)
+    skipped: bool = False
+    skip_reason: Optional[str] = Field(None, max_length=32)
     note: Optional[str] = Field(None, max_length=2000)
     # Optional pointer to evidence (a doc the consultant can click through
     # to verify the answer). Restricted to http/https so we don't accept
@@ -40,6 +47,27 @@ class ResponseSubmit(BaseModel):
         max_length=512,
         pattern=r"^https?://",
     )
+
+    @model_validator(mode="after")
+    def _value_xor_skipped(self) -> "ResponseSubmit":
+        if self.skipped and self.value is not None:
+            raise ValueError("A skipped response cannot also carry a value")
+        if not self.skipped and self.value is None:
+            raise ValueError("Either provide a value (0-4) or set skipped=true")
+        return self
+
+
+class ResponseOut(BaseModel):
+    """Response shape for GET /assessments/{id}/responses."""
+    question_id: str
+    value: Optional[int]
+    skipped: bool
+    skip_reason: Optional[str]
+    note: Optional[str]
+    evidence_url: Optional[str]
+    answered_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
 
 
 class BulkResponsesSubmit(BaseModel):

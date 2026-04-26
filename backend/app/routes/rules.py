@@ -32,6 +32,7 @@ def get_rules(
             QuestionSchema(
                 id=q.id,
                 text=q.text,
+                weight=q.weight,
                 options=[{"value": o.value, "label": o.label} for o in q.options],
                 evidence_prompt=q.evidence_prompt,
                 regulatory_note=q.regulatory_note,
