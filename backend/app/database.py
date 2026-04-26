@@ -14,8 +14,6 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base
-
 
 def _resolve_database_url() -> str:
     """
@@ -63,16 +61,31 @@ def get_db():
 
 def init_db() -> None:
     """
-    Create all tables from the SQLAlchemy metadata. Safe to call repeatedly
-    -- create_all is idempotent on existing tables.
+    Bring the database schema up to the latest Alembic revision. Called
+    on FastAPI startup. Idempotent; no-op if already at head.
 
-    Note: this is fine for fresh local dev and the current single-instance
-    Railway deployment, but it does NOT apply schema changes once the
-    initial schema is in place. For schema evolution, use alembic:
+    Why Alembic instead of `Base.metadata.create_all()`:
 
-        alembic revision --autogenerate -m "describe the change"
-        alembic upgrade head
+    create_all silently created any new model tables it found, which
+    collided with subsequent `alembic upgrade head` runs (the migration
+    tried to recreate tables init_db had already made, and Alembic blew
+    up with "table X already exists"). Routing every startup through
+    Alembic means there's exactly one path to schema changes and no
+    parallel-path conflicts.
 
-    See alembic/README and docs/architecture.md for the full workflow.
+    For multi-replica deploys this should move out of app startup
+    (release-phase command instead) so two boots don't race the
+    migration. Single-instance Railway is fine here.
     """
-    Base.metadata.create_all(bind=engine)
+    # Local imports so this module stays usable in alembic/env.py without
+    # creating an import cycle.
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+
+    alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+    cfg = Config(str(alembic_ini))
+    # env.py reads DATABASE_URL itself, but be explicit to handle the
+    # rare case where a worker has a different env loaded.
+    cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+    command.upgrade(cfg, "head")
