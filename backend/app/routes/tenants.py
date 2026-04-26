@@ -119,6 +119,65 @@ def get_tenant(
     return tenant
 
 
+@router.delete("/{slug}", status_code=204)
+def delete_tenant(
+    slug: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    DSAR fulfillment — hard-delete a tenant and every assessment, response,
+    finding, annotation, publication, and membership it owns. Garabyte
+    admin only (audit H4).
+
+    Cascade rules:
+      - Assessments / responses / findings / annotations / publications:
+        ORM cascade="all, delete-orphan" on Tenant.assessments
+        plus FK ondelete=CASCADE on the dependent rows.
+      - OrgMembership rows: FK ondelete=CASCADE.
+      - AccessLog rows: FK ondelete=SET NULL — audit trail survives the
+        deletion (the regulator's "what happened to org X" question still
+        needs an answer after the data is gone).
+      - VerificationToken invitation rows reference org_id only inside
+        their JSON payload; they expire on their own.
+
+    The deletion itself is logged with the tenant's name + slug so the
+    audit log can answer "what was deleted" after the row is gone.
+    """
+    tenant = db.query(Tenant).filter(Tenant.slug == slug).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Tenant not found: {slug}")
+
+    is_garabyte_admin = any(m.role == ROLE_GARABYTE_ADMIN for m in user.memberships)
+    if not is_garabyte_admin:
+        log_access(
+            db, user_id=user.id, org_id=tenant.id, action="tenant.delete.denied",
+            resource_kind="tenant", resource_id=tenant.id,
+            ip=request.client.host if request.client else None,
+        )
+        db.commit()
+        raise HTTPException(status_code=403, detail="Only Garabyte admins may delete tenants")
+
+    # Snapshot identifying fields before the row vanishes.
+    snapshot = {
+        "slug": tenant.slug,
+        "name": tenant.name,
+        "sector": tenant.sector,
+        "is_demo": tenant.is_demo,
+        "assessment_count": len(tenant.assessments),
+    }
+    log_access(
+        db, user_id=user.id, org_id=tenant.id, action="tenant.delete",
+        resource_kind="tenant", resource_id=tenant.id,
+        ip=request.client.host if request.client else None,
+        context=snapshot,
+    )
+
+    db.delete(tenant)
+    db.commit()
+
+
 @router.get("/{slug}/history", response_model=list[TenantHistoryItem])
 def get_tenant_history(
     slug: str,

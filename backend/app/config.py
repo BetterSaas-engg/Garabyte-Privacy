@@ -30,6 +30,27 @@ class Settings(BaseSettings):
     # invitation flows. In production, set FRONTEND_BASE_URL via env.
     frontend_base_url: str = "http://localhost:3000"
 
+    # ---- Email transport (Phase 7) ---------------------------------------
+    # Drives which sender backend send_email() routes through:
+    #   "stdout"  — print to uvicorn terminal (default; safe for dev)
+    #   "smtp"    — connect to smtp_host/port with STARTTLS and send for real
+    # Any other value raises at startup.
+    email_backend: str = "stdout"
+
+    # SMTP credentials. Only consulted when email_backend == "smtp" — leaving
+    # them blank in dev is fine. Required values fail loudly in main.py at
+    # startup when the smtp backend is selected.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_starttls: bool = True
+
+    # The visible From: header. The DMARC-aligned identity should match the
+    # SMTP user's domain or the customer will see "via …" decorations.
+    email_from: str = "Garabyte Privacy <no-reply@garabyte.example>"
+    email_reply_to: str = ""
+
     # DATABASE_URL is read directly by app/database.py, not here.
 
     @property

@@ -353,6 +353,56 @@ def get_assessment(
     return a
 
 
+@assessments_router.delete("/{assessment_id}", status_code=204)
+def delete_assessment(
+    assessment_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    DSAR fulfillment, narrower scope — delete one assessment and everything
+    that hangs off it (responses, findings, annotations, publication).
+    Use this when a customer wants to drop a single preliminary draft
+    without removing the org entirely (audit H4).
+
+    Authorization: garabyte_admin (any membership) or org_admin of the
+    owning tenant. Org admin can only delete their own org's assessments;
+    cross-org deletion is admin-only.
+
+    Cascade: Assessment.* relationships are configured with
+    cascade="all, delete-orphan" plus FK ondelete=CASCADE on the dependent
+    rows. AccessLog rows survive (resource_id will dangle once the
+    assessment is gone — that's intentional for audit defensibility).
+    """
+    a = _load_assessment_or_404(db, assessment_id)
+
+    is_garabyte_admin = any(m.role == ROLE_GARABYTE_ADMIN for m in user.memberships)
+    if not is_garabyte_admin:
+        # Non-admins must be an org_admin of this tenant.
+        ensure_membership(
+            db, user, a.tenant_id,
+            roles=(ROLE_ORG_ADMIN,),
+            request=request,
+            action="assessment.delete.check",
+        )
+
+    snapshot = {
+        "tenant_id": a.tenant_id,
+        "label": a.label,
+        "status": a.status,
+        "overall_score": a.overall_score,
+        "published": a.published_at is not None,
+    }
+    log_access(
+        db, user_id=user.id, org_id=a.tenant_id, action="assessment.delete",
+        resource_kind="assessment", resource_id=a.id, ip=_ip(request),
+        context=snapshot,
+    )
+    db.delete(a)
+    db.commit()
+
+
 @assessments_router.post(
     "/{assessment_id}/responses",
     response_model=BulkResponsesResult,
