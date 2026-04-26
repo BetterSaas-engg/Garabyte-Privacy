@@ -1,9 +1,9 @@
 # Audit follow-ups
 
 After the Phase 1–10 work, an independent code-reviewer pass turned up
-sixteen findings. Six were fixed inline (commit `120b8da` — see
-`docs/dsar-runbook.md`-adjacent commit message). The rest are tracked
-here so they're not forgotten.
+sixteen findings. Six were fixed in commit `120b8da`; A1–A4 (the four
+🟠 items below) were fixed in a follow-up commit. The remaining six 🟡
+items are tracked here so they're not forgotten.
 
 Severity tier follows the same scheme as the original audit: 🔴 ship-
 blocker, 🟠 fix before customer GA, 🟡 next sprint.
@@ -15,22 +15,12 @@ blocker, 🟠 fix before customer GA, 🟡 next sprint.
 - 🔴 Invitation `dimension_ids` not validated against the rules library — `auth/routes.py:create_invitation` now rejects unknown ids with 400.
 - 🟠 Evidence MIME header was the only check; HTML-as-PDF could enable stored XSS — magic-byte verification rejects mismatches at 415; download disposition is `attachment` + `nosniff` so anything that slipped through doesn't render in-place.
 - 🟠 No CSRF defense on cookie-auth mutations — every mutating request must now carry `X-Requested-With: garabyte`; the header is non-simple under CORS, forcing a preflight that's gated by the allow_origins list.
+- 🟠 **A1.** Tenant + assessment DELETE flows now log `*.intent` in their own transaction before the cascade, then `*.complete` (or `*.failed` with the exception) after. The cascade can no longer roll back the audit trail. `tenant.delete.complete` lands with `org_id=None` because the tenant FK is gone by then.
+- 🟠 **A2.** `_revoke_share_links_for` now stamps `revoked_at` on every non-revoked row, including ones that have expired naturally. Audit trail can distinguish expired-vs-revoked via the action name, not via the absence of `revoked_at`.
+- 🟠 **A3.** `auth/routes.py:accept_invitation` now resolves `get_current_user_optional` and rejects with 409 + `auth.invitation.identity_mismatch` audit row when the signed-in email differs from the invitation's email. The `consume_token` call is rolled back so the recipient can sign out and re-accept with the same link.
+- 🟠 **A4.** Tenant + assessment DELETE flows now enumerate every `share_link` they're about to cascade-destroy and log `share_link.cascade_delete` rows for each (with label, was_revoked, cascade_reason). Post-DSAR invalid-token reads can be correlated by `resource_id`. A defensive `share_link.read.tombstone` row is also logged in the unreachable-with-FK-on case where a link survives its assessment.
 
 ## Still hanging
-
-### 🟠 High
-
-**A1. Tenant DELETE logging is in the same transaction as the cascade.**
-`routes/tenants.py:delete_tenant` calls `log_access(...)` then `db.delete(tenant)` then `db.commit()`. If the cascade traversal raises (e.g. some future model has a stale FK), the audit row never lands because everything rolls back together. Fix: split into two transactions — log first, commit, then delete.
-
-**A2. `_revoke_share_links_for` ignores already-expired links.**
-`routes/assessments.py:_revoke_share_links_for` filters on `expires_at > now`. Expired-but-not-revoked rows stay around with no `revoked_at`, so the audit trail can't distinguish "expired naturally" from "revoked on republish." Set `revoked_at = now` on those rows too, or split the audit-action.
-
-**A3. Invitation accept path doesn't check identity match.**
-`auth/routes.py:accept_invitation` calls `consume_token` and then mints a new session. If a logged-in user A clicks an invitation link addressed to user B, the flow attaches a fresh B-session AND adds a membership in B's name. If A and B are different humans, you've conflated identities. Fix: when `get_current_user_optional` returns a user with a different email than `row.email`, reject with 409 and prompt for sign-out.
-
-**A4. Audit-log gap on share-link reads of deleted assessments.**
-`routes/share_links.py:read_shared_report` raises 404 at `:288` (assessment was DSAR-deleted under a still-active link) without a log row. Add `log_access(... "share_link.read.tombstone")` so DSAR-aftermath access attempts are evidenced — they're the most likely surface where a regulator asks "who tried to view this after we said it was gone?"
 
 ### 🟡 Medium
 
@@ -50,8 +40,8 @@ blocker, 🟠 fix before customer GA, 🟡 next sprint.
 
 ## Recommended fix order
 
-A1 + A4 (audit-log gaps) are 5-minute fixes and worth picking off next.
-A3 (invitation identity check) is the highest-impact remaining item —
-it's a quiet identity-confusion bug in a flow customers actually use.
-A6 is the largest scope; do it before raising the file-size cap above
-10 MB.
+🟠 items (A1–A4) are now landed. Of the remaining 🟡 set, A6 is the
+largest scope (rewrite evidence upload to stream-read with a running
+size counter) — do it before raising the 10 MB file-size cap. A10
+(multi-replica migration race) is the only one that blocks production
+scaling; address before the second Railway instance.

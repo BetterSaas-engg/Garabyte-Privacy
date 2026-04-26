@@ -33,7 +33,7 @@ from ..models import (
     User,
     ALL_ROLES,
 )
-from .deps import SESSION_COOKIE, get_current_user
+from .deps import SESSION_COOKIE, get_current_user, get_current_user_optional
 from .email import send_email
 from .rate import limiter
 from .schemas import (
@@ -632,12 +632,19 @@ def accept_invitation(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> UserOut:
     """
     Consume an invitation token. If the email is new, create the user
     (password required). If the email already has an account, just add the
     membership. Either way, the inviter's email-bound contract (R&P C1) is
     enforced: the accepting user IS the invited email.
+
+    Identity-confusion guard (audit A3): if the request is already
+    authenticated as a *different* user than the invitation's email, refuse
+    with 409 before consuming the token. Otherwise A could click an
+    invitation addressed to B, get B's session minted on top of their own,
+    and gain B's membership in B's name — a quiet identity swap.
     """
     row = consume_token(db, plaintext=payload.token, purpose=TOKEN_INVITATION)
     if not row:
@@ -647,6 +654,27 @@ def accept_invitation(
         raise HTTPException(400, "Invalid or expired invitation")
 
     email = _normalize_email(row.email)
+
+    # If the visitor is already signed in as someone OTHER than the invitee,
+    # roll back the token consumption so they can sign out and try again,
+    # then 409. Same-email is fine — they're already auth'd as the right
+    # person, we just need to attach the membership.
+    if current_user is not None and _normalize_email(current_user.email) != email:
+        db.rollback()
+        log_access(
+            db, user_id=current_user.id, action="auth.invitation.identity_mismatch",
+            ip=_client_ip(request),
+            context={"invited_email": email, "session_email": current_user.email},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"This invitation is for {email}, but you're signed in as "
+                f"{current_user.email}. Sign out and follow the link again."
+            ),
+        )
+
     org_id = row.payload["org_id"]
     role = row.payload["role"]
     dimension_ids = row.payload.get("dimension_ids")

@@ -387,6 +387,7 @@ def delete_assessment(
             action="assessment.delete.check",
         )
 
+    # Audit-fix A1: intent commit before the cascade, follow-up row after.
     snapshot = {
         "tenant_id": a.tenant_id,
         "label": a.label,
@@ -394,12 +395,54 @@ def delete_assessment(
         "overall_score": a.overall_score,
         "published": a.published_at is not None,
     }
+    aid = a.id
+    tid = a.tenant_id
     log_access(
-        db, user_id=user.id, org_id=a.tenant_id, action="assessment.delete",
-        resource_kind="assessment", resource_id=a.id, ip=_ip(request),
+        db, user_id=user.id, org_id=tid, action="assessment.delete.intent",
+        resource_kind="assessment", resource_id=aid, ip=_ip(request),
         context=snapshot,
     )
-    db.delete(a)
+    # Audit-fix A4: log every share link about to die so post-DSAR
+    # invalid-token reads can be correlated by resource_id.
+    from ..models import ShareLink
+    for sl in db.query(ShareLink).filter(ShareLink.assessment_id == aid).all():
+        log_access(
+            db, user_id=user.id, org_id=tid,
+            action="share_link.cascade_delete",
+            resource_kind="share_link", resource_id=sl.id,
+            ip=_ip(request),
+            context={
+                "assessment_id": aid,
+                "label": sl.label,
+                "was_revoked": sl.revoked_at is not None,
+                "cascade_reason": "assessment.delete",
+            },
+        )
+    db.commit()
+
+    try:
+        t = db.query(Assessment).filter(Assessment.id == aid).first()
+        if t is not None:
+            db.delete(t)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        log_access(
+            db, user_id=user.id, org_id=tid, action="assessment.delete.failed",
+            resource_kind="assessment", resource_id=aid, ip=_ip(request),
+            context={**snapshot, "error": str(exc)[:300]},
+        )
+        db.commit()
+        raise
+
+    # org_id stays attached because the tenant survives an assessment
+    # delete. (Compare to tenant.delete.complete where the tenant is gone
+    # and we have to NULL the org_id to satisfy the FK.)
+    log_access(
+        db, user_id=user.id, org_id=tid, action="assessment.delete.complete",
+        resource_kind="assessment", resource_id=aid, ip=_ip(request),
+        context=snapshot,
+    )
     db.commit()
 
 
@@ -874,9 +917,17 @@ def unpublish_assessment(
 
 def _revoke_share_links_for(db: Session, assessment_id: int) -> int:
     """
-    Revoke every active share link for an assessment. Returns count
-    revoked (so the caller can log it). Used on republish so old recipients
-    don't silently see new content (R&P C21 + the ShareLink model docstring).
+    Revoke every share link for an assessment that hasn't already been
+    explicitly revoked — including ones that have expired naturally.
+    Used on republish so old recipients don't silently see new content
+    (R&P C21 + the ShareLink model docstring).
+
+    Audit-fix A2: previously this filtered on `expires_at > now`, leaving
+    expired-but-unrevoked rows with revoked_at=NULL. That made the audit
+    trail unable to distinguish "expired naturally" from "revoked on
+    republish" — both looked the same. Now every non-revoked row gets a
+    revoked_at stamp; the audit-log action distinguishes the cause.
+    Returns count revoked so the caller can log it.
     """
     from ..models import ShareLink  # local import to avoid circular
     now = datetime.utcnow()
@@ -885,7 +936,6 @@ def _revoke_share_links_for(db: Session, assessment_id: int) -> int:
         .filter(
             ShareLink.assessment_id == assessment_id,
             ShareLink.revoked_at.is_(None),
-            ShareLink.expires_at > now,
         )
         .all()
     )

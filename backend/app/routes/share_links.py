@@ -277,7 +277,7 @@ def read_shared_report(
         # Don't distinguish revoked / expired / wrong token in the response —
         # the recipient gets the same message either way.
         log_access(
-            db, action="share_link.read.invalid",
+            db, user_id=None, action="share_link.read.invalid",
             resource_kind="share_link", resource_id=link.id if link else None,
             ip=_ip(request),
         )
@@ -286,7 +286,19 @@ def read_shared_report(
 
     a = db.query(Assessment).filter(Assessment.id == link.assessment_id).first()
     if not a:
-        # The assessment was deleted (e.g. DSAR) — same opaque error.
+        # The assessment was deleted (e.g. DSAR) — same opaque error to the
+        # recipient. Audit-fix A4: log this as a "tombstone read" so the
+        # audit trail captures who tried to view the report after we said
+        # it was gone — this is the surface a regulator is most likely to
+        # ask about post-DSAR.
+        log_access(
+            db, user_id=None, action="share_link.read.tombstone",
+            org_id=link.assessment_id and None,  # assessment is gone, no org link
+            resource_kind="share_link", resource_id=link.id,
+            ip=_ip(request),
+            context={"assessment_id": link.assessment_id},
+        )
+        db.commit()
         raise HTTPException(status_code=404, detail="This link is no longer valid.")
 
     pub = _get_active_publication(db, a.id)

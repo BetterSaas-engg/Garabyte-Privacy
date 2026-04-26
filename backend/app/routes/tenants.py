@@ -166,7 +166,11 @@ def delete_tenant(
         db.commit()
         raise HTTPException(status_code=403, detail="Only Garabyte admins may delete tenants")
 
-    # Snapshot identifying fields before the row vanishes.
+    # Audit-fix A1: log the intent and commit BEFORE the cascade. If the
+    # cascade traversal raises, the intent row still survives — a regulator
+    # asking "did anyone try to delete org X?" gets a yes regardless of
+    # whether the delete completed. A follow-up "complete" or "failed"
+    # row records the outcome.
     snapshot = {
         "slug": tenant.slug,
         "name": tenant.name,
@@ -174,14 +178,68 @@ def delete_tenant(
         "is_demo": tenant.is_demo,
         "assessment_count": len(tenant.assessments),
     }
+    tenant_id = tenant.id
     log_access(
-        db, user_id=user.id, org_id=tenant.id, action="tenant.delete",
-        resource_kind="tenant", resource_id=tenant.id,
+        db, user_id=user.id, org_id=tenant_id, action="tenant.delete.intent",
+        resource_kind="tenant", resource_id=tenant_id,
         ip=request.client.host if request.client else None,
         context=snapshot,
     )
+    # Audit-fix A4: log every share link about to be destroyed by the
+    # assessment cascade. Post-DSAR read attempts otherwise hit
+    # share_link.read.invalid with resource_id=None and the regulator
+    # can't tell what was being probed. With these rows in place, an
+    # invalid-token read on the deleted link can be correlated by
+    # timestamp + the cascade_delete row's resource_id.
+    from ..models import Assessment, ShareLink
+    share_links_to_kill = (
+        db.query(ShareLink)
+        .join(Assessment, ShareLink.assessment_id == Assessment.id)
+        .filter(Assessment.tenant_id == tenant_id)
+        .all()
+    )
+    for sl in share_links_to_kill:
+        log_access(
+            db, user_id=user.id, org_id=tenant_id,
+            action="share_link.cascade_delete",
+            resource_kind="share_link", resource_id=sl.id,
+            ip=request.client.host if request.client else None,
+            context={
+                "assessment_id": sl.assessment_id,
+                "label": sl.label,
+                "was_revoked": sl.revoked_at is not None,
+                "cascade_reason": "tenant.delete",
+            },
+        )
+    db.commit()
 
-    db.delete(tenant)
+    try:
+        # Re-fetch in the new transaction — `tenant` is from the previous
+        # session state and SQLAlchemy expects a fresh handle for delete.
+        t = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if t is not None:
+            db.delete(t)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        log_access(
+            db, user_id=user.id, org_id=tenant_id, action="tenant.delete.failed",
+            resource_kind="tenant", resource_id=tenant_id,
+            ip=request.client.host if request.client else None,
+            context={**snapshot, "error": str(exc)[:300]},
+        )
+        db.commit()
+        raise
+
+    # org_id MUST be None here — the tenant row is gone, and the access_log
+    # FK rejects an insert pointing at a non-existent tenant. resource_id
+    # preserves the dangling reference for forensic correlation.
+    log_access(
+        db, user_id=user.id, org_id=None, action="tenant.delete.complete",
+        resource_kind="tenant", resource_id=tenant_id,
+        ip=request.client.host if request.client else None,
+        context=snapshot,
+    )
     db.commit()
 
 
