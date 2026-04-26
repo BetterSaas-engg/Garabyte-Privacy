@@ -36,3 +36,7 @@ class TenantHistoryItem(BaseModel):
     overall_score: Optional[float]
     overall_maturity: Optional[str]
     completed_at: Optional[datetime]
+    # Phase 5: customer-facing trend should distinguish "scored but
+    # awaiting consultant review" from "published". Frontend renders
+    # the published row as authoritative and grays the unpublished one.
+    published_at: Optional[datetime] = None

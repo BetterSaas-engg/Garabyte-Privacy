@@ -21,6 +21,10 @@ class AssessmentOut(BaseModel):
     overall_maturity: Optional[str] = None
     started_at: datetime
     completed_at: Optional[datetime] = None
+    # Phase 5: when the consultant published the report. Until set, the
+    # customer dashboard shows "Awaiting consultant review" instead of
+    # the rendered report (R&P C14).
+    published_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

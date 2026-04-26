@@ -155,6 +155,7 @@ def get_tenant_history(
             overall_score=a.overall_score,
             overall_maturity=a.overall_maturity,
             completed_at=a.completed_at,
+            published_at=a.published_at,
         )
         for a in completed
     ]

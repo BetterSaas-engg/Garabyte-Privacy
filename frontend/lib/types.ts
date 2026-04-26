@@ -30,6 +30,91 @@ export interface TenantHistoryItem {
   overall_score: number | null;
   overall_maturity: string | null;
   completed_at: string | null;
+  published_at: string | null;
+}
+
+// Phase 5 — finding + annotation types
+
+export type AnnotationStatus =
+  | "unreviewed"
+  | "confirmed"
+  | "severity_adjusted"
+  | "replaced"
+  | "dismissed";
+
+export interface FindingFromApi {
+  id: number;
+  assessment_id: number;
+  dimension_id: string;
+  finding_template_id: string | null;
+
+  // Effective (post-annotation) values — what the customer sees.
+  severity: string;
+  finding_text: string;
+  recommendation: string | null;
+  regulatory_risk: string | null;
+  typical_consulting_hours: number | null;
+  upsell_hook: string | null;
+
+  // Engine layer for the consultant diff view.
+  engine_severity: string;
+  engine_finding_text: string;
+  engine_recommendation: string | null;
+  engine_regulatory_risk: string | null;
+  engine_hours: number | null;
+
+  source: "engine" | "consultant";
+  score: number | null;
+
+  annotation_status: AnnotationStatus;
+  annotation_rationale: string | null;
+  annotation_consultant_id: number | null;
+  annotation_at: string | null;
+}
+
+export interface AnnotationCreateBody {
+  status: Exclude<AnnotationStatus, "unreviewed">;
+  new_severity?: string;
+  new_finding_text?: string;
+  new_recommendation?: string;
+  new_regulatory_risk?: string;
+  new_hours?: number;
+  rationale?: string;
+}
+
+export interface AnnotationFromApi {
+  id: number;
+  finding_id: number;
+  consultant_id: number | null;
+  status: string;
+  new_severity: string | null;
+  new_finding_text: string | null;
+  new_recommendation: string | null;
+  new_regulatory_risk: string | null;
+  new_hours: number | null;
+  rationale: string | null;
+  created_at: string;
+}
+
+export interface CustomFindingCreateBody {
+  dimension_id: string;
+  severity: string;
+  finding_text: string;
+  recommendation?: string;
+  regulatory_risk?: string;
+  typical_consulting_hours?: number;
+}
+
+export interface PublishCreateBody {
+  cover_note?: string;
+}
+
+export interface PublicationFromApi {
+  id: number;
+  assessment_id: number;
+  published_by_id: number | null;
+  published_at: string;
+  cover_note: string | null;
 }
 
 // ---- Assessments ----
@@ -43,6 +128,10 @@ export interface Assessment {
   overall_maturity: string | null;
   started_at: string;
   completed_at: string | null;
+  // Phase 5: present iff the consultant has published the report.
+  // Until set, customer-facing surfaces should show "Awaiting consultant
+  // review" instead of the rendered findings.
+  published_at: string | null;
 }
 
 export interface ResponseSubmit {

@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  getAssessmentFindings,
   getAssessmentResult,
+  getRules,
   getTenant,
   getTenantHistory,
   isUnauthorized,
@@ -12,6 +14,9 @@ import {
 } from "@/lib/api";
 import type {
   AssessmentResultOut,
+  Dimension,
+  FindingFromApi,
+  GapFinding,
   Tenant,
   TenantHistoryItem,
 } from "@/lib/types";
@@ -19,6 +24,30 @@ import { ScoreSummary } from "@/components/ScoreSummary";
 import { DimensionGrid } from "@/components/DimensionGrid";
 import { GapFindingCard } from "@/components/GapFinding";
 import { AssessmentHistory } from "@/components/AssessmentHistory";
+
+// Map a (post-annotation) FindingFromApi onto the existing GapFinding
+// shape so we can keep using GapFindingCard. Dismissed findings should
+// already be filtered out by the caller before this is called.
+function findingToGap(f: FindingFromApi, dimensionsByid: Map<string, Dimension>): GapFinding {
+  return {
+    dimension_id: f.dimension_id,
+    dimension_name: dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id,
+    severity: (f.severity as GapFinding["severity"]) ?? "moderate",
+    finding: f.finding_text,
+    recommendation: f.recommendation ?? "",
+    regulatory_risk: f.regulatory_risk,
+    typical_consulting_hours: f.typical_consulting_hours,
+    upsell_hook: f.upsell_hook,
+    score: f.score ?? 0,
+  };
+}
+
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  moderate: 2,
+  low: 3,
+};
 
 export default function TenantDashboard({
   params,
@@ -30,34 +59,65 @@ export default function TenantDashboard({
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [history, setHistory] = useState<TenantHistoryItem[] | null>(null);
-  const [latestResult, setLatestResult] = useState<AssessmentResultOut | null>(null);
+  // The most recent assessment (may or may not be published). Drives the
+  // "Awaiting consultant review" banner.
+  const [latestItem, setLatestItem] = useState<TenantHistoryItem | null>(null);
+  // The latest *published* assessment's full result. We show this report
+  // even if a newer unpublished assessment exists.
+  const [publishedResult, setPublishedResult] = useState<AssessmentResultOut | null>(null);
+  // Findings for the published assessment (post-annotation, dismissed filtered).
+  const [findings, setFindings] = useState<FindingFromApi[] | null>(null);
+  const [dimensionsByid, setDimensionsByid] = useState<Map<string, Dimension>>(new Map());
   const [canStart, setCanStart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [t, h, w] = await Promise.all([
+        const [t, h, w, rules] = await Promise.all([
           getTenant(slug),
           getTenantHistory(slug),
           whoami(),
+          getRules(),
         ]);
         setTenant(t);
         document.title = `${t.name} — Garabyte Privacy Health Check`;
         setHistory(h);
 
-        // Org admin (or Garabyte admin) can start a new assessment.
+        const dMap = new Map<string, Dimension>();
+        rules.dimensions.forEach((d) => dMap.set(d.id, d));
+        setDimensionsByid(dMap);
+
         const isGarabyteAdmin = w.memberships.some((m) => m.role === "garabyte_admin");
         const isOrgAdmin = w.memberships.some(
           (m) => m.org_id === t.id && m.role === "org_admin",
         );
         setCanStart(isGarabyteAdmin || isOrgAdmin);
 
-        if (h.length > 0) {
-          const latest = h[h.length - 1];
-          const result = await getAssessmentResult(latest.assessment_id);
-          setLatestResult(result);
-        }
+        if (h.length === 0) return;
+        // Latest by completed_at (history is already ordered oldest-first).
+        const latest = h[h.length - 1];
+        setLatestItem(latest);
+
+        // Find the most recent *published* item. If none yet, no report
+        // gets rendered — only the "awaiting review" empty state.
+        const published = [...h].reverse().find((x) => x.published_at);
+        if (!published) return;
+
+        const [result, fs] = await Promise.all([
+          getAssessmentResult(published.assessment_id),
+          getAssessmentFindings(published.assessment_id),
+        ]);
+        setPublishedResult(result);
+        setFindings(
+          fs
+            .filter((f) => f.annotation_status !== "dismissed")
+            .sort(
+              (a, b) =>
+                (SEVERITY_RANK[a.severity] ?? 99) - (SEVERITY_RANK[b.severity] ?? 99) ||
+                (a.score ?? 0) - (b.score ?? 0),
+            ),
+        );
       } catch (e) {
         if (isUnauthorized(e)) {
           router.replace("/auth/login");
@@ -115,6 +175,13 @@ export default function TenantDashboard({
   const previousScore =
     history.length >= 2 ? history[history.length - 2].overall_score : null;
 
+  // Awaiting-review state: a completed assessment exists but isn't published.
+  // If there's already a published earlier assessment, the banner appears
+  // above the older report. If there's no published assessment yet, only
+  // the awaiting-review state shows.
+  const awaitingReview =
+    latestItem !== null && latestItem.published_at === null;
+
   return (
     <main className="min-h-[calc(100vh-73px)] px-6 py-12">
       <div className="max-w-5xl mx-auto space-y-10">
@@ -147,8 +214,25 @@ export default function TenantDashboard({
           </div>
         </div>
 
-        {/* No completed assessments yet — empty state */}
-        {!latestResult && (
+        {/* Awaiting consultant review banner */}
+        {awaitingReview && (
+          <div className="rounded-xl border border-garabyte-accent-300 bg-garabyte-accent-100/40 p-5">
+            <p className="text-h3 text-garabyte-primary-800 mb-1">
+              Awaiting consultant review
+            </p>
+            <p className="text-sm text-garabyte-ink-700">
+              {latestItem?.label ? `${latestItem.label} — ` : ""}submitted on{" "}
+              {latestItem?.completed_at
+                ? new Date(latestItem.completed_at).toLocaleDateString("en-CA")
+                : "—"}
+              . Your consultant is reviewing the engine&apos;s findings and will publish the report shortly.
+              You&apos;ll be notified by email when it&apos;s ready.
+            </p>
+          </div>
+        )}
+
+        {/* No published assessments at all yet — empty state */}
+        {!publishedResult && !awaitingReview && (
           <div className="rounded-xl bg-white shadow-soft border border-garabyte-ink-100 p-8 text-center">
             <p className="text-h3 text-garabyte-primary-800 mb-2">
               No completed assessments yet
@@ -171,39 +255,42 @@ export default function TenantDashboard({
           </div>
         )}
 
-        {/* Score summary, dimension grid, gaps, history — only when there's a completed assessment */}
-        {latestResult && (
+        {/* Published report (latest published, even if a newer draft exists) */}
+        {publishedResult && (
           <>
             <ScoreSummary
-              assessmentLabel={latestResult.assessment.label}
-              overallScore={latestResult.result.overall_score}
-              maturityLabel={latestResult.result.overall_maturity_label}
+              assessmentLabel={publishedResult.assessment.label}
+              overallScore={publishedResult.result.overall_score}
+              maturityLabel={publishedResult.result.overall_maturity_label}
               previousScore={previousScore}
-              coverage={latestResult.result.coverage}
-              assessedAt={latestResult.result.assessed_at}
-              rulesVersion={latestResult.result.rules_version}
+              coverage={publishedResult.result.coverage}
+              assessedAt={publishedResult.result.assessed_at}
+              rulesVersion={publishedResult.result.rules_version}
             />
 
             <section>
               <div className="flex items-baseline justify-between mb-5">
                 <h2 className="text-h2 text-garabyte-primary-800">Dimension breakdown</h2>
                 <p className="text-sm text-garabyte-ink-500">
-                  {latestResult.result.dimension_scores.length} dimensions scored
+                  {publishedResult.result.dimension_scores.length} dimensions scored
                 </p>
               </div>
-              <DimensionGrid dimensionScores={latestResult.result.dimension_scores} />
+              <DimensionGrid dimensionScores={publishedResult.result.dimension_scores} />
             </section>
 
             <section>
               <div className="flex items-baseline justify-between mb-5">
                 <h2 className="text-h2 text-garabyte-primary-800">Prioritized gaps</h2>
                 <p className="text-sm text-garabyte-ink-500">
-                  {latestResult.result.gaps.length} findings · sorted by severity
+                  {findings?.length ?? 0} findings · sorted by severity
                 </p>
               </div>
               <div className="space-y-3">
-                {latestResult.result.gaps.map((gap, i) => (
-                  <GapFindingCard key={`${gap.dimension_id}-${i}`} gap={gap} />
+                {findings?.map((f) => (
+                  <GapFindingCard
+                    key={f.id}
+                    gap={findingToGap(f, dimensionsByid)}
+                  />
                 ))}
               </div>
             </section>

@@ -22,6 +22,12 @@ import type {
   AssessmentResultOut,
   RulesLibrary,
   HealthResponse,
+  AnnotationCreateBody,
+  AnnotationFromApi,
+  CustomFindingCreateBody,
+  FindingFromApi,
+  PublicationFromApi,
+  PublishCreateBody,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
@@ -138,6 +144,44 @@ export function getAssessmentResponses(
   assessmentId: number,
 ): Promise<ResponseOut[]> {
   return apiRequest<ResponseOut[]>(`/assessments/${assessmentId}/responses`);
+}
+
+// ---- Findings + annotations + publish (Phase 5) ----
+
+export function getAssessmentFindings(
+  assessmentId: number,
+): Promise<FindingFromApi[]> {
+  return apiRequest<FindingFromApi[]>(`/assessments/${assessmentId}/findings`);
+}
+
+export function createCustomFinding(
+  assessmentId: number,
+  payload: CustomFindingCreateBody,
+): Promise<FindingFromApi> {
+  return apiRequest<FindingFromApi>(`/assessments/${assessmentId}/findings`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createAnnotation(
+  findingId: number,
+  payload: AnnotationCreateBody,
+): Promise<AnnotationFromApi> {
+  return apiRequest<AnnotationFromApi>(`/findings/${findingId}/annotations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function publishAssessment(
+  assessmentId: number,
+  payload: PublishCreateBody = {},
+): Promise<PublicationFromApi> {
+  return apiRequest<PublicationFromApi>(`/assessments/${assessmentId}/publish`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function scoreAssessment(

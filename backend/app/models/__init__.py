@@ -3,6 +3,18 @@ from .base import Base
 from .tenant import Tenant
 from .assessment import Assessment
 from .response import Response
+from .finding import (
+    AssessmentPublication,
+    Finding,
+    FindingAnnotation,
+    ALL_ANNOTATION_STATUSES,
+    ANNOTATION_CONFIRMED,
+    ANNOTATION_DISMISSED,
+    ANNOTATION_REPLACED,
+    ANNOTATION_SEVERITY_ADJUSTED,
+    FINDING_SOURCE_CONSULTANT,
+    FINDING_SOURCE_ENGINE,
+)
 from .auth import (
     User,
     OrgMembership,
@@ -28,6 +40,16 @@ __all__ = [
     "Tenant",
     "Assessment",
     "Response",
+    "AssessmentPublication",
+    "Finding",
+    "FindingAnnotation",
+    "ALL_ANNOTATION_STATUSES",
+    "ANNOTATION_CONFIRMED",
+    "ANNOTATION_DISMISSED",
+    "ANNOTATION_REPLACED",
+    "ANNOTATION_SEVERITY_ADJUSTED",
+    "FINDING_SOURCE_CONSULTANT",
+    "FINDING_SOURCE_ENGINE",
     "User",
     "OrgMembership",
     "AuthSession",

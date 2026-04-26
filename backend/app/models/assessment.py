@@ -36,6 +36,18 @@ class Assessment(Base):
         cascade="all, delete-orphan",
     )
 
+    @property
+    def published_at(self):
+        """
+        Convenience accessor used by AssessmentOut.from_attributes so the
+        customer-facing dashboard can show "Awaiting consultant review"
+        between completion and publication (R&P C13/C14, Phase 5).
+
+        publication backref is defined on AssessmentPublication.assessment.
+        """
+        pub = getattr(self, "publication", None)
+        return pub.published_at if pub else None
+
     def __repr__(self) -> str:
         return (
             f"<Assessment id={self.id} tenant_id={self.tenant_id} "
