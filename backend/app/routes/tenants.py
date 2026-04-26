@@ -87,6 +87,13 @@ def create_tenant(
     tenant = Tenant(**payload.model_dump())
     db.add(tenant)
     db.flush()
+    # Grant the creating garabyte_admin an org_admin membership on the new
+    # tenant so it shows up in their own InviteModal dropdown and they can
+    # issue invitations / start an assessment without an extra step. The
+    # garabyte_admin role still elevates them across all tenants; this is
+    # an additional explicit row for UI listing purposes.
+    db.add(OrgMembership(user_id=user.id, org_id=tenant.id, role=ROLE_ORG_ADMIN))
+    db.flush()
     log_access(db, user_id=user.id, org_id=tenant.id, action="tenant.create",
                resource_kind="tenant", resource_id=tenant.id,
                ip=request.client.host if request.client else None)

@@ -261,13 +261,6 @@ export interface InvitationPreview {
   dimension_ids: string[] | null;
 }
 
-export function signup(payload: { email: string; password: string; name?: string }) {
-  return apiRequest<{ email: string; message: string }>("/auth/signup", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 export function verifyEmail(token: string) {
   return apiRequest<AuthUser>("/auth/verify-email", {
     method: "POST",

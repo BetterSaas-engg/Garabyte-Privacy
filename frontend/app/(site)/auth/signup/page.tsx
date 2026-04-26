@@ -1,44 +1,11 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { signup } from "@/lib/api";
-import {
-  AuthShell,
-  ErrorBanner,
-  FieldLabel,
-  InfoBanner,
-  PrimaryButton,
-  TextField,
-} from "@/components/auth/AuthShell";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 export default function SignupPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    setSubmitting(true);
-    try {
-      const res = await signup({ email, password, name: name || undefined });
-      setInfo(res.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-up failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <AuthShell
-      title="Create your account"
-      subtitle="We'll send a verification link to confirm your email."
+      title="Garabyte Privacy is invitation-only"
+      subtitle="Accounts are created when you accept an invitation from your privacy lead."
       footer={
         <span>
           Already have an account?{" "}
@@ -48,47 +15,28 @@ export default function SignupPage() {
         </span>
       }
     >
-      <ErrorBanner message={error} />
-      <InfoBanner message={info} />
-      {!info && (
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <FieldLabel>Name</FieldLabel>
-            <TextField
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={255}
-            />
-          </div>
-          <div>
-            <FieldLabel>Work email</FieldLabel>
-            <TextField
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <FieldLabel>Password</FieldLabel>
-            <TextField
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={12}
-              placeholder="At least 12 characters"
-            />
-          </div>
-          <PrimaryButton disabled={submitting}>
-            {submitting ? "Creating account…" : "Create account"}
-          </PrimaryButton>
-        </form>
-      )}
+      <div className="space-y-4 text-[13.5px] leading-6 text-[#4B5360]">
+        <p>
+          We don&apos;t support self-signup. To get access:
+        </p>
+        <ul className="list-disc list-outside pl-5 space-y-1.5">
+          <li>
+            If your <span className="text-[#1F242C] font-medium">privacy lead</span> has invited you,
+            check your email for a link from Garabyte. Following that link will set up your account.
+          </li>
+          <li>
+            If you&apos;re a Garabyte client and you don&apos;t have an invitation yet, ask the
+            person at your organization who manages privacy.
+          </li>
+          <li>
+            If you&apos;re unsure, contact{" "}
+            <a href="mailto:support@garabyte.com" className="text-[#3A6FB8] hover:underline">
+              support@garabyte.com
+            </a>
+            .
+          </li>
+        </ul>
+      </div>
     </AuthShell>
   );
 }

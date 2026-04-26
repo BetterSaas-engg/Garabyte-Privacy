@@ -38,11 +38,9 @@ export default function LoginPage() {
       title="Sign in"
       subtitle="Use your work email and password."
       footer={
-        <span>
-          New here?{" "}
-          <Link href="/auth/signup" className="text-[#3A6FB8] hover:underline">
-            Create an account
-          </Link>
+        <span className="text-[#6B7280]">
+          Garabyte Privacy is invitation-only. If your privacy lead invited you,
+          check your email for the sign-in link.
         </span>
       }
     >

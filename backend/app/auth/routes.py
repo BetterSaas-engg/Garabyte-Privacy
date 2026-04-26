@@ -130,10 +130,27 @@ def signup(
     db: Session = Depends(get_db),
 ) -> SignupOut:
     """
-    Create an unverified user, mint an email_verify token, send it. Same
-    response whether the address is new or already registered (prevents
-    enumeration). Rate limited to 5/min per IP to slow brute creation.
+    Self-signup is disabled — Garabyte Privacy is invitation-only.
+    A user without a pending invitation has no tenant to land on, so
+    self-signup produces orphan accounts that can't do anything until an
+    admin intervenes. New users arrive via the invitation accept flow
+    (`/auth/invitations/accept`), which creates the account and the
+    membership in one shot.
+
+    The endpoint stays mounted (rather than removed) so existing frontend
+    deploys get a clear 403 with a pointer to the right path, instead of
+    a confusing 404. Rate limit stays in place to slow probing.
     """
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "Self-signup is disabled. Garabyte Privacy is invitation-only — "
+            "ask your privacy lead for an invitation, or contact "
+            "support@garabyte.com."
+        ),
+    )
+
+    # Unreachable; preserved for reference if invite-only is ever reversed.
     email = _normalize_email(payload.email)
     existing = db.query(User).filter(User.email == email).first()
 
