@@ -77,6 +77,12 @@ export default function TenantDashboard({
   const [publishedResult, setPublishedResult] = useState<AssessmentResultOut | null>(null);
   // Findings for the published assessment (post-annotation, dismissed filtered).
   const [findings, setFindings] = useState<FindingFromApi[] | null>(null);
+  // Prior published assessment's findings + completed-at, for the
+  // "what's changed since last quarter" diff panel. Null when there's
+  // no prior published assessment yet (first-published case).
+  const [priorFindings, setPriorFindings] = useState<FindingFromApi[] | null>(null);
+  const [priorDate, setPriorDate] = useState<string | null>(null);
+  const [priorRulesVersion, setPriorRulesVersion] = useState<string | null>(null);
   const [dimensionsByid, setDimensionsByid] = useState<Map<string, Dimension>>(new Map());
   const [canStart, setCanStart] = useState(false);
   const [consultants, setConsultants] = useState<TenantConsultant[]>([]);
@@ -114,7 +120,8 @@ export default function TenantDashboard({
 
         // Find the most recent *published* item. If none yet, no report
         // gets rendered — only the "awaiting review" empty state.
-        const published = [...h].reverse().find((x) => x.published_at);
+        const publishedDescending = [...h].reverse().filter((x) => x.published_at);
+        const published = publishedDescending[0];
         if (!published) return;
 
         const [result, fs] = await Promise.all([
@@ -131,6 +138,25 @@ export default function TenantDashboard({
                 (a.score ?? 0) - (b.score ?? 0),
             ),
         );
+
+        // If there's a *prior* published assessment, fetch its findings
+        // for the "what's changed since" diff panel. Only the most recent
+        // prior is compared — successive comparisons across many history
+        // points belong on a separate report-history view.
+        const prior = publishedDescending[1];
+        if (prior) {
+          const [priorResult, priorFs] = await Promise.all([
+            getAssessmentResult(prior.assessment_id),
+            getAssessmentFindings(prior.assessment_id),
+          ]);
+          setPriorFindings(
+            priorFs.filter((f) => f.annotation_status !== "dismissed"),
+          );
+          setPriorDate(prior.published_at ?? prior.completed_at ?? null);
+          setPriorRulesVersion(
+            (priorResult.result as { rules_version?: string }).rules_version ?? null,
+          );
+        }
       } catch (e) {
         if (isUnauthorized(e)) {
           router.replace("/auth/login");
@@ -310,6 +336,24 @@ export default function TenantDashboard({
               <DimensionGrid dimensionScores={publishedResult.result.dimension_scores} />
             </section>
 
+            {/* What's changed since the prior assessment. Only renders when
+                there's a prior published assessment to compare against;
+                first-published case shows nothing. Diff is by
+                finding_template_id (stable across re-scorings under the
+                same rules_version). */}
+            {priorFindings && findings && (
+              <ChangesSincePanel
+                current={findings}
+                prior={priorFindings}
+                priorDate={priorDate}
+                priorRulesVersion={priorRulesVersion}
+                currentRulesVersion={
+                  (publishedResult.result as { rules_version?: string }).rules_version ?? null
+                }
+                dimensionsByid={dimensionsByid}
+              />
+            )}
+
             {(() => {
               const compoundFindings = (findings ?? []).filter((f) => f.dimension_id === "compound");
               const dimFindings = (findings ?? []).filter((f) => f.dimension_id !== "compound");
@@ -373,5 +417,179 @@ export default function TenantDashboard({
         )}
       </div>
     </main>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// "What's changed since" diff panel.
+// Diff semantics:
+//   - "Visible" finding = annotation_status != "dismissed". Matches what the
+//     customer would see at the time. A dismissed finding counts as absent
+//     for diff purposes — engine fired but the consultant chose to suppress.
+//   - Match key = finding_template_id (stable hash of dimension+severity+
+//     finding_text under a single rules_version). Reworded findings get a
+//     new template_id, which surfaces as "resolved + new" — that's accurate;
+//     a reworded finding is operationally a different recommendation.
+//   - rules_version mismatch between assessments adds a discontinuity note
+//     (audit H11) so customers can interpret the diff with the right caveat.
+// ---------------------------------------------------------------------------
+
+function ChangesSincePanel({
+  current,
+  prior,
+  priorDate,
+  priorRulesVersion,
+  currentRulesVersion,
+  dimensionsByid,
+}: {
+  current: FindingFromApi[];
+  prior: FindingFromApi[];
+  priorDate: string | null;
+  priorRulesVersion: string | null;
+  currentRulesVersion: string | null;
+  dimensionsByid: Map<string, Dimension>;
+}) {
+  // Build template_id sets for set-difference math.
+  const currentByTemplate = new Map<string, FindingFromApi>();
+  current.forEach((f) => {
+    if (f.finding_template_id) currentByTemplate.set(f.finding_template_id, f);
+  });
+  const priorByTemplate = new Map<string, FindingFromApi>();
+  prior.forEach((f) => {
+    if (f.finding_template_id) priorByTemplate.set(f.finding_template_id, f);
+  });
+
+  const newFindings: FindingFromApi[] = [];
+  const persistingFindings: FindingFromApi[] = [];
+  const resolvedFindings: FindingFromApi[] = [];
+
+  currentByTemplate.forEach((f, tid) => {
+    if (priorByTemplate.has(tid)) persistingFindings.push(f);
+    else newFindings.push(f);
+  });
+  priorByTemplate.forEach((f, tid) => {
+    if (!currentByTemplate.has(tid)) resolvedFindings.push(f);
+  });
+
+  // First-real-comparison sanity: if every finding looks "new" because the
+  // prior assessment had a totally different set, we still render — that
+  // IS the diff. The discontinuity note below covers the edge case.
+  const totalChanges = newFindings.length + resolvedFindings.length;
+  if (totalChanges === 0 && persistingFindings.length === 0) {
+    // Both assessments empty — nothing useful to show.
+    return null;
+  }
+
+  const priorLabel = priorDate
+    ? new Date(priorDate).toLocaleDateString("en-CA")
+    : "the prior assessment";
+  const rulesShifted =
+    priorRulesVersion && currentRulesVersion && priorRulesVersion !== currentRulesVersion;
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-h2 text-garabyte-primary-800">Changes since {priorLabel}</h2>
+        <p className="text-sm text-garabyte-ink-500">
+          {resolvedFindings.length} resolved · {newFindings.length} new ·{" "}
+          {persistingFindings.length} persisting
+        </p>
+      </div>
+      {rulesShifted && (
+        <p className="rounded-md border border-garabyte-accent-200 bg-garabyte-accent-100/40 px-3 py-2 text-[12.5px] text-garabyte-accent-700 mb-5">
+          The rules library was updated between these assessments
+          ({priorRulesVersion} → {currentRulesVersion}). Some changes here may
+          reflect rule updates rather than program changes; ask your consultant
+          to flag any that surprise you.
+        </p>
+      )}
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <DiffColumn
+          tone="good"
+          title="Resolved"
+          subtitle="Fired before, gone now"
+          findings={resolvedFindings}
+          dimensionsByid={dimensionsByid}
+        />
+        <DiffColumn
+          tone="critical"
+          title="New"
+          subtitle="Wasn't here last quarter"
+          findings={newFindings}
+          dimensionsByid={dimensionsByid}
+        />
+        <DiffColumn
+          tone="moderate"
+          title="Persisting"
+          subtitle="Still on the to-do list"
+          findings={persistingFindings}
+          dimensionsByid={dimensionsByid}
+        />
+      </div>
+    </section>
+  );
+}
+
+function DiffColumn({
+  tone,
+  title,
+  subtitle,
+  findings,
+  dimensionsByid,
+}: {
+  tone: "good" | "critical" | "moderate";
+  title: string;
+  subtitle: string;
+  findings: FindingFromApi[];
+  dimensionsByid: Map<string, Dimension>;
+}) {
+  const accent =
+    tone === "good"
+      ? "border-garabyte-status-good/40 bg-garabyte-status-good/5"
+      : tone === "critical"
+        ? "border-garabyte-status-critical/40 bg-garabyte-status-critical/5"
+        : "border-garabyte-ink-100 bg-garabyte-cream-100/40";
+  const titleColor =
+    tone === "good"
+      ? "text-garabyte-status-good"
+      : tone === "critical"
+        ? "text-garabyte-status-critical"
+        : "text-garabyte-ink-700";
+  return (
+    <article className={`rounded-xl border p-4 ${accent}`}>
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className={`text-sm font-medium ${titleColor}`}>{title}</h3>
+        <span className="text-[11px] tabular-nums text-garabyte-ink-500">
+          {findings.length}
+        </span>
+      </div>
+      <p className="text-[11.5px] text-garabyte-ink-500 mb-3">{subtitle}</p>
+      {findings.length === 0 ? (
+        <p className="text-[12.5px] text-garabyte-ink-300">—</p>
+      ) : (
+        <ul className="space-y-2 text-[12.5px]">
+          {findings.map((f) => {
+            const dimName =
+              f.dimension_id === "compound"
+                ? "Cross-cutting"
+                : dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id;
+            return (
+              <li key={f.id}>
+                <span className="text-[10.5px] uppercase tracking-[0.06em] text-garabyte-ink-500 mr-1.5">
+                  {dimName}
+                </span>
+                <span className="text-garabyte-ink-700 leading-snug">
+                  {f.finding_text.length > 120
+                    ? f.finding_text.slice(0, 120) + "…"
+                    : f.finding_text}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </article>
   );
 }
