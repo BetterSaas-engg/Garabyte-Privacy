@@ -31,9 +31,17 @@ import { AssessmentHistory } from "@/components/AssessmentHistory";
 // shape so we can keep using GapFindingCard. Dismissed findings should
 // already be filtered out by the caller before this is called.
 function findingToGap(f: FindingFromApi, dimensionsByid: Map<string, Dimension>): GapFinding {
+  // Compound findings live under the sentinel dimension_id "compound";
+  // they have no real Dimension to resolve. Render a plain label so the
+  // GapFindingCard header reads "Cross-cutting" instead of literal
+  // "compound" or a hash.
+  const dimName =
+    f.dimension_id === "compound"
+      ? "Cross-cutting"
+      : dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id;
   return {
     dimension_id: f.dimension_id,
-    dimension_name: dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id,
+    dimension_name: dimName,
     severity: (f.severity as GapFinding["severity"]) ?? "moderate",
     finding: f.finding_text,
     recommendation: f.recommendation ?? "",
@@ -302,22 +310,60 @@ export default function TenantDashboard({
               <DimensionGrid dimensionScores={publishedResult.result.dimension_scores} />
             </section>
 
-            <section>
-              <div className="flex items-baseline justify-between mb-5">
-                <h2 className="text-h2 text-garabyte-primary-800">Prioritized gaps</h2>
-                <p className="text-sm text-garabyte-ink-500">
-                  {findings?.length ?? 0} findings · sorted by severity
-                </p>
-              </div>
-              <div className="space-y-3">
-                {findings?.map((f) => (
-                  <GapFindingCard
-                    key={f.id}
-                    gap={findingToGap(f, dimensionsByid)}
-                  />
-                ))}
-              </div>
-            </section>
+            {(() => {
+              const compoundFindings = (findings ?? []).filter((f) => f.dimension_id === "compound");
+              const dimFindings = (findings ?? []).filter((f) => f.dimension_id !== "compound");
+              return (
+                <>
+                  {/* Cross-cutting (compound) findings sit above the per-dimension
+                      list because they describe pathologies a single dimension
+                      can't capture — most-impactful framing for a customer
+                      reading the report top-to-bottom. */}
+                  {compoundFindings.length > 0 && (
+                    <section>
+                      <div className="flex items-baseline justify-between mb-3">
+                        <h2 className="text-h2 text-garabyte-primary-800">Cross-cutting findings</h2>
+                        <p className="text-sm text-garabyte-ink-500">
+                          {compoundFindings.length} compound{" "}
+                          {compoundFindings.length === 1 ? "finding" : "findings"}
+                        </p>
+                      </div>
+                      <p className="text-sm text-garabyte-ink-700 max-w-prose mb-5">
+                        These findings come from a combination of dimensions —
+                        weak data inventory plus weak rights handling means
+                        deletion can&apos;t complete, even if either dimension
+                        looks acceptable on its own.
+                      </p>
+                      <div className="space-y-3">
+                        {compoundFindings.map((f) => (
+                          <GapFindingCard
+                            key={f.id}
+                            gap={findingToGap(f, dimensionsByid)}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  <section>
+                    <div className="flex items-baseline justify-between mb-5">
+                      <h2 className="text-h2 text-garabyte-primary-800">Prioritized gaps</h2>
+                      <p className="text-sm text-garabyte-ink-500">
+                        {dimFindings.length} findings · sorted by severity
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {dimFindings.map((f) => (
+                        <GapFindingCard
+                          key={f.id}
+                          gap={findingToGap(f, dimensionsByid)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                </>
+              );
+            })()}
 
             <section>
               <h2 className="text-h2 text-garabyte-primary-800 mb-5">Assessment history</h2>

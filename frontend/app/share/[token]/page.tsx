@@ -114,7 +114,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
             <article key={i} className="rounded-lg border border-[#E2E5EA] bg-white px-5 py-4">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <p className="text-[11px] uppercase tracking-[0.06em] text-[#9AA1AD] font-medium">
-                  {f.dimension_id}
+                  {f.dimension_id === "compound" ? "Cross-cutting" : f.dimension_id}
                 </p>
                 <span className={`inline-flex items-center h-5 px-2 rounded text-[11px] font-medium border tabular-nums ${SEVERITY_TONE[f.severity] ?? SEVERITY_TONE.moderate}`}>
                   {f.severity}

@@ -1,0 +1,144 @@
+# Cross-dimension compound rules
+#
+# Each rule fires when EVERY listed condition matches the relevant
+# dimension's score. Conditions are bounded (score_min and/or score_max);
+# a condition with no bound is rejected at load time as decorative.
+#
+# Compound findings are surfaced as a separate "Cross-cutting findings"
+# panel on the report — they describe pathologies a single dimension
+# can't capture (e.g. "deletion is impossible because the data
+# inventory is incomplete"). They sit on top of per-dimension findings;
+# they don't replace them.
+#
+# IDs are stable. Rewording a rule is fine; renaming an id breaks
+# downstream Finding rows and trend tracking.
+
+compound_rules:
+
+  - id: c1_blind_deletion
+    severity: critical
+    finding: Cannot honor deletion requests due to inventory gaps
+    conditions:
+      - dimension: d2
+        score_max: 1.5
+      - dimension: d4
+        score_max: 2.0
+    recommendation: >
+      Even if the rights-fulfillment process (d4) is sound on paper, deletion
+      cannot complete across systems the organization has no inventory of (d2).
+      Sequence the inventory work first — start with the systems that hold the
+      most personal data, then expand. Running the rights workflow build in
+      parallel typically wastes the rights-side effort because it has nowhere
+      to send delete requests.
+    regulatory_risk: >
+      PIPEDA Principle 9 and Quebec Law 25 s. 27 both require defensible
+      deletion. Unverified deletion (we believed we deleted but data persists
+      in unmapped systems) is itself a violation, regardless of intent.
+    typical_consulting_hours: 60
+
+  - id: c2_consent_without_propagation
+    severity: high
+    finding: Consent is captured but cannot be enforced downstream
+    conditions:
+      - dimension: d3
+        score_min: 2.0
+      - dimension: d2
+        score_max: 2.0
+    recommendation: >
+      The consent layer (d3) is more mature than the data inventory (d2) it
+      depends on. Withdrawal events cannot reach systems the organization
+      has not mapped. Prioritize data-flow documentation across the systems
+      with the largest consent-relevant surface (marketing, support, product
+      analytics) before any further consent-tooling investment.
+    regulatory_risk: >
+      Quebec Law 25 s. 14 requires withdrawal of consent to take effect.
+      GDPR Article 7(3) likewise requires withdrawal to be as easy as giving
+      consent. Captured-but-not-propagated consent is a documented complaint
+      pattern at both regulators.
+    typical_consulting_hours: 24
+
+  - id: c3_ai_outpaces_governance
+    severity: high
+    finding: AI deployment is outrunning the governance layer
+    conditions:
+      - dimension: d8
+        score_min: 2.0
+      - dimension: d1
+        score_max: 2.0
+    recommendation: >
+      AI risk assessments without an accountable governance layer (d1)
+      produce paperwork no one enforces. Strengthen the governance layer
+      (named accountable officer, escalation paths, board reporting cadence)
+      in parallel with any further AI program build. Doing AI alone creates
+      a paper tiger that fails at the first regulator inquiry.
+    regulatory_risk: >
+      AIDA s. 7 (anticipated) requires an accountable person for high-impact
+      systems. PIPEDA Principle 1 (accountability) is engaged the moment
+      automated decisioning touches personal data. Without governance the
+      AI work cannot satisfy either.
+    typical_consulting_hours: 32
+
+  - id: c4_vendor_risk_no_oversight
+    severity: high
+    finding: Third-party data flows lack governance review
+    conditions:
+      - dimension: d5
+        score_max: 2.0
+      - dimension: d1
+        score_max: 2.0
+    recommendation: >
+      Weak vendor management (d5) compounded by weak governance (d1) means
+      no one is accountable for the third parties who touch personal data —
+      vendor selection, DPA execution, ongoing monitoring, and offboarding
+      all happen ad-hoc. Stand up a vendor risk register tied to the
+      governance layer's review cadence; the two halves only work together.
+    regulatory_risk: >
+      PIPEDA Principle 1 makes the organization accountable for personal data
+      transferred to third parties. GDPR Article 28 requires processor
+      agreements with specific clauses. A vendor program without a governance
+      anchor leaves both unsatisfied.
+    typical_consulting_hours: 28
+
+  - id: c5_rights_without_records
+    severity: high
+    finding: Rights workflow runs but cannot prove its work
+    conditions:
+      - dimension: d4
+        score_min: 2.5
+      - dimension: d2
+        score_max: 1.5
+    recommendation: >
+      The rights-fulfillment process (d4) is exercised regularly, but the
+      data inventory (d2) is too thin to prove it ran completely. A regulator
+      asking "show me the deletion you did for customer X" will receive a
+      partial answer at best. Bring the inventory up to a defensible level
+      so the rights work becomes verifiable end-to-end.
+    regulatory_risk: >
+      Quebec Law 25 s. 9 requires the organization to be able to demonstrate
+      compliance. PIPEDA Principle 9.4 likewise requires accuracy across all
+      systems holding the data. Unverifiable fulfillment is an audit failure
+      mode even when the work itself happened.
+    typical_consulting_hours: 36
+
+  - id: c6_governance_theater
+    severity: moderate
+    finding: Governance is documented but disconnected from operations
+    conditions:
+      - dimension: d1
+        score_min: 3.0
+      - dimension: d2
+        score_max: 1.5
+      - dimension: d4
+        score_max: 1.5
+    recommendation: >
+      Governance (d1) is well-documented on paper, but the operational layers
+      it should drive — data inventory (d2) and rights handling (d4) — are
+      both weak. Policies that don't translate into operational reality are
+      "governance theater." Refocus the governance layer's attention on
+      bringing the operational dimensions up rather than producing more
+      policy artifacts.
+    regulatory_risk: >
+      Mature regulators (OPC, CAI, EDPB) increasingly look past policy
+      documentation to operational evidence. A program that scores well on
+      d1 but poorly elsewhere is a known red flag pattern in audits.
+    typical_consulting_hours: 40

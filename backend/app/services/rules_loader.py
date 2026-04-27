@@ -108,9 +108,55 @@ class Dimension:
 
 
 @dataclass
+class CompoundCondition:
+    """
+    One condition in a compound rule. Matches when the named dimension's
+    score falls inside the bounded range. At least one of score_min /
+    score_max MUST be set — a fully unbounded condition is decorative
+    (matches every score) and is rejected at load time per the audit.
+    """
+    dimension: str
+    score_min: float | None = None
+    score_max: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.score_min is None and self.score_max is None:
+            raise ValueError(
+                f"Compound condition on {self.dimension!r} has no bounds — "
+                f"set score_min and/or score_max."
+            )
+
+    def matches(self, score: float) -> bool:
+        if self.score_min is not None and score < self.score_min:
+            return False
+        if self.score_max is not None and score > self.score_max:
+            return False
+        return True
+
+
+@dataclass
+class CompoundRule:
+    """
+    A cross-dimension finding. Fires only when EVERY listed condition
+    matches. Conditions are ANDed; OR semantics are deliberately not
+    supported — every credible compound finding in the audit's design
+    discussion was naturally an AND.
+    """
+    id: str
+    severity: str  # critical | high | moderate | low
+    finding: str
+    recommendation: str
+    conditions: list[CompoundCondition]
+    regulatory_risk: str | None = None
+    typical_consulting_hours: int | None = None
+    upsell_hook: str | None = None
+
+
+@dataclass
 class RulesLibrary:
     """The complete rules library ��� all 8 dimensions plus validation."""
     dimensions: list[Dimension]
+    compound_rules: list[CompoundRule] = field(default_factory=list)
     # Short stable identifier for the loaded YAML content. Used to stamp
     # AssessmentResult so a stored report can be traced to the rules version
     # in effect when it was scored. Computed at load time as sha256(concat
@@ -183,6 +229,24 @@ class RulesLibrary:
                         f"Dimension {d.id} maturity_levels disagree with "
                         f"{self.dimensions[0].id}: level {ml.level} is "
                         f"{ml.label!r} here vs {canonical.get(ml.level)!r} there"
+                    )
+
+        # Compound rules must reference dimensions that exist. A typo
+        # (e.g. "d20" for "d2") would silently produce a never-firing
+        # rule otherwise.
+        known_dim_ids = {d.id for d in self.dimensions}
+        seen_compound_ids: set[str] = set()
+        for r in self.compound_rules:
+            if r.id in seen_compound_ids:
+                raise ValueError(f"Duplicate compound rule id: {r.id}")
+            seen_compound_ids.add(r.id)
+            if not r.conditions:
+                raise ValueError(f"Compound rule {r.id} has no conditions")
+            for cond in r.conditions:
+                if cond.dimension not in known_dim_ids:
+                    raise ValueError(
+                        f"Compound rule {r.id} references unknown dimension "
+                        f"{cond.dimension!r}"
                     )
 
 
@@ -274,6 +338,27 @@ def _parse_dimension(raw: dict[str, Any]) -> Dimension:
     )
 
 
+def _parse_compound_rule(raw: dict[str, Any]) -> CompoundRule:
+    conditions = [
+        CompoundCondition(
+            dimension=c["dimension"],
+            score_min=c.get("score_min"),
+            score_max=c.get("score_max"),
+        )
+        for c in raw.get("conditions", [])
+    ]
+    return CompoundRule(
+        id=raw["id"],
+        severity=raw["severity"],
+        finding=raw["finding"],
+        recommendation=raw["recommendation"],
+        conditions=conditions,
+        regulatory_risk=raw.get("regulatory_risk"),
+        typical_consulting_hours=raw.get("typical_consulting_hours"),
+        upsell_hook=raw.get("upsell_hook"),
+    )
+
+
 # ---- Public entry point ----
 
 
@@ -309,12 +394,26 @@ def load_rules_library(rules_dir: Path | str) -> RulesLibrary:
         hasher.update(b"\0")
     version = hasher.hexdigest()[:12]
 
+    compound_rules: list[CompoundRule] = []
     for yaml_file in yaml_files:
         with open(yaml_file, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
-        all_dimensions.append(_parse_dimension(raw))
 
-    library = RulesLibrary(dimensions=all_dimensions, version=version)
+        # A YAML file is either a dimension (has top-level dimension fields)
+        # or a compound-rules file (top-level "compound_rules" key). The
+        # split-by-content keeps file naming flexible — compound_rules.yaml
+        # is conventional but not required.
+        if isinstance(raw, dict) and "compound_rules" in raw:
+            for rule_raw in raw["compound_rules"]:
+                compound_rules.append(_parse_compound_rule(rule_raw))
+        else:
+            all_dimensions.append(_parse_dimension(raw))
+
+    library = RulesLibrary(
+        dimensions=all_dimensions,
+        compound_rules=compound_rules,
+        version=version,
+    )
     library.validate()
     return library
 

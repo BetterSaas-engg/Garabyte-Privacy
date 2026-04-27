@@ -19,7 +19,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from .rules_loader import RulesLibrary, Dimension, MaturityLevel
+from .rules_loader import CompoundRule, Dimension, MaturityLevel, RulesLibrary
 
 
 # Bump when the result_json shape changes in a way the frontend or stored
@@ -227,6 +227,56 @@ def _generate_gaps(dimension: Dimension, dim_score: float) -> list[GapFinding]:
     return findings
 
 
+# Sentinel dimension_id for cross-dimension findings. The frontend keys
+# off this string to render compound findings in their own "Cross-cutting
+# findings" panel above the per-dimension list.
+COMPOUND_DIMENSION_ID = "compound"
+
+
+def _evaluate_compound_rules(
+    compound_rules: list[CompoundRule],
+    dim_scores_by_id: dict[str, float],
+    skipped_dim_ids: set[str],
+) -> list[GapFinding]:
+    """
+    Fire each compound rule whose conditions ALL match. Sort score is
+    the lowest of the score_max-bounded dimensions in the rule (so
+    low-d2-driven findings land near other d2 problems in severity-then-
+    score ordering). Skipped/no-data dimensions are excluded — firing
+    a compound rule off a dimension we couldn't score is the same
+    silent-mistake pattern as audit C4.
+    """
+    findings: list[GapFinding] = []
+    for rule in compound_rules:
+        if any(c.dimension in skipped_dim_ids for c in rule.conditions):
+            continue
+        if not all(
+            c.matches(dim_scores_by_id.get(c.dimension, 0.0))
+            for c in rule.conditions
+        ):
+            continue
+        bounded_scores = [
+            dim_scores_by_id.get(c.dimension, 0.0)
+            for c in rule.conditions
+            if c.score_max is not None
+        ]
+        sort_score = min(bounded_scores) if bounded_scores else 0.0
+        findings.append(
+            GapFinding(
+                dimension_id=COMPOUND_DIMENSION_ID,
+                dimension_name=rule.id,
+                severity=rule.severity,
+                finding=rule.finding,
+                recommendation=rule.recommendation,
+                regulatory_risk=rule.regulatory_risk,
+                typical_consulting_hours=rule.typical_consulting_hours,
+                upsell_hook=rule.upsell_hook,
+                score=sort_score,
+            )
+        )
+    return findings
+
+
 def score_assessment(
     rules: RulesLibrary,
     responses: dict[str, int],
@@ -270,6 +320,16 @@ def score_assessment(
         # bug from C4). The UI should show "not enough data" for these.
         if ds.confidence != "none":
             all_gaps.extend(_generate_gaps(dim, ds.score))
+
+    # Evaluate cross-dimension compound rules. Same C4 guard — exclude
+    # any rule whose conditions touch a no-data dimension.
+    dim_score_map = {ds.dimension_id: ds.score for ds in dim_scores}
+    skipped_dim_ids = {
+        ds.dimension_id for ds in dim_scores if ds.confidence == "none"
+    }
+    all_gaps.extend(
+        _evaluate_compound_rules(rules.compound_rules, dim_score_map, skipped_dim_ids)
+    )
 
     # Overall score is the weighted mean of dimensions with usable data.
     # Skipped / barely-answered dimensions are excluded so a partial assessment

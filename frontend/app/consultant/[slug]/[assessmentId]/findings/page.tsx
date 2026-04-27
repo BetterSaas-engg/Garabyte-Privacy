@@ -345,7 +345,12 @@ function FindingCard({
     || f.engine_recommendation !== f.recommendation
     || f.engine_regulatory_risk !== f.regulatory_risk;
 
-  const dimensionName = dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id;
+  // Compound findings have no Dimension entry; show a stable label
+  // instead of the bare "compound" sentinel id.
+  const dimensionName =
+    f.dimension_id === "compound"
+      ? "Cross-cutting"
+      : dimensionsByid.get(f.dimension_id)?.name ?? f.dimension_id;
   const left =
     f.severity === "critical" || f.severity === "high"
       ? "#B53A3A"
