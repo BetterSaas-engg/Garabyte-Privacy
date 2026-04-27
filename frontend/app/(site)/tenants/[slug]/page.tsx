@@ -326,6 +326,20 @@ export default function TenantDashboard({
               rulesVersion={publishedResult.result.rules_version}
             />
 
+            {/* Board-distributable artifact. Anchor opens the PDF endpoint
+                directly — the response is Content-Disposition: attachment
+                so the browser downloads rather than navigating away. */}
+            <div className="-mt-4 mb-2 flex justify-end">
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001"}/assessments/${publishedResult.assessment.id}/report.pdf`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center text-[12.5px] px-3 py-1.5 rounded-md border border-garabyte-ink-100 text-garabyte-primary-700 hover:bg-garabyte-cream-100 transition-colors"
+              >
+                ↓ Download PDF
+              </a>
+            </div>
+
             <section>
               <div className="flex items-baseline justify-between mb-5">
                 <h2 className="text-h2 text-garabyte-primary-800">Dimension breakdown</h2>

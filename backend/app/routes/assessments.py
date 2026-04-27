@@ -1070,3 +1070,90 @@ def get_result(
                resource_kind="assessment", resource_id=a.id, ip=_ip(request))
     db.commit()
     return AssessmentResultOut(assessment=a, result=a.result_json)
+
+
+@assessments_router.get("/{assessment_id}/report.pdf")
+def get_report_pdf(
+    assessment_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Download a PDF of the published report. Reads membership-gated; only
+    available once the assessment is both scored AND published. Returns
+    the post-annotation customer view (dismissed findings filtered, any
+    annotation overrides applied).
+    """
+    from fastapi.responses import StreamingResponse
+    from ..services.pdf_export import render_assessment_pdf
+
+    a = _load_assessment_or_404(db, assessment_id)
+    ensure_membership(
+        db, user, a.tenant_id,
+        roles=_ASSESSMENT_READ_ROLES,
+        request=request,
+        action="assessment.report_pdf.check",
+    )
+
+    pub = (
+        db.query(AssessmentPublication)
+        .filter(AssessmentPublication.assessment_id == assessment_id)
+        .first()
+    )
+    if pub is None or pub.unpublished_at is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Report is not currently published.",
+        )
+    if a.status != "completed" or not a.result_json:
+        raise HTTPException(400, "Assessment has not been scored yet")
+
+    tenant = db.query(Tenant).filter(Tenant.id == a.tenant_id).first()
+    findings_rows = (
+        db.query(Finding)
+        .filter(Finding.assessment_id == assessment_id)
+        .order_by(Finding.id.asc())
+        .all()
+    )
+    # Project through the same merge logic the frontend uses, then
+    # filter dismissed (matches the customer-visible report exactly).
+    merged = [_merge_finding(f) for f in findings_rows]
+    visible = [
+        m for m in merged
+        if m.get("annotation_status") != ANNOTATION_DISMISSED
+    ]
+
+    pdf_bytes = render_assessment_pdf(
+        tenant_name=tenant.name if tenant else f"Tenant #{a.tenant_id}",
+        tenant_jurisdiction=(tenant.jurisdiction if tenant else None),
+        assessment_label=a.label,
+        overall_score=a.overall_score,
+        overall_maturity=a.overall_maturity,
+        dimension_scores=(a.result_json or {}).get("dimension_scores", []),
+        findings=visible,
+        cover_note=pub.cover_note,
+        published_at=pub.published_at,
+        rules_version=(a.result_json or {}).get("rules_version"),
+    )
+
+    log_access(
+        db, user_id=user.id, org_id=a.tenant_id, action="assessment.report_pdf.read",
+        resource_kind="assessment", resource_id=a.id, ip=_ip(request),
+        context={"size_bytes": len(pdf_bytes)},
+    )
+    db.commit()
+
+    safe_slug = (tenant.slug if tenant else f"a{a.id}").replace('"', "")
+    safe_label = (a.label or f"v{pub.version}").replace('"', "").replace("/", "-")
+    filename = f"garabyte-{safe_slug}-{safe_label}.pdf"
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
