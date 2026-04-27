@@ -163,7 +163,7 @@ export default function SamplePage() {
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-garabyte-accent-100 text-garabyte-accent-700 border border-garabyte-accent-200">
                   {OVERALL_MATURITY}
                 </span>
-                <span className="text-xs text-garabyte-ink-500">8 dimensions · 86 questions</span>
+                <span className="text-xs text-garabyte-ink-500">8 dimensions · 40 questions</span>
               </div>
               <p className="text-sm text-garabyte-ink-700 leading-relaxed">
                 Acme has a strong governance and breach-response foundation, but

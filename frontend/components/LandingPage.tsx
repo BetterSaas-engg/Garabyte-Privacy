@@ -226,7 +226,7 @@ export function LandingPage() {
               number="01"
               meta="About 40 minutes"
               title="Take the assessment"
-              body="Answer 86 structured questions. Attach supporting documents where you have them. Skip what doesn’t apply — the engine records that as a gap, not an error."
+              body="Answer 40 structured questions across 8 dimensions. Attach supporting documents where you have them. Skip what doesn’t apply — the engine records that as a gap, not an error."
             />
             <Step
               number="02"
