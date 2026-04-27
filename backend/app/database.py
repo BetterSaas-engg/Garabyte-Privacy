@@ -88,9 +88,22 @@ def init_db() -> None:
     Alembic means there's exactly one path to schema changes and no
     parallel-path conflicts.
 
-    For multi-replica deploys this should move out of app startup
-    (release-phase command instead) so two boots don't race the
-    migration. Single-instance Railway is fine here.
+    Multi-replica safety (audit A10):
+
+    On Postgres we wrap the upgrade in a session-level advisory lock
+    (`pg_advisory_lock`). The first replica acquires it and runs the
+    upgrade; later replicas booting at the same time block until the
+    lock releases, then no-op because the schema is already at head.
+    The lock ID is a fixed arbitrary 64-bit constant tied to this
+    application; it doesn't conflict with any other locks Postgres
+    might use.
+
+    On SQLite the lock is a no-op — there's only one process accessing
+    the file at a time in dev anyway.
+
+    The CORRECT long-term fix is to move migrations out of app startup
+    entirely (Railway "release" command or equivalent). The advisory
+    lock is the next-best thing for the current single-binary deploy.
     """
     # Local imports so this module stays usable in alembic/env.py without
     # creating an import cycle.
@@ -103,4 +116,17 @@ def init_db() -> None:
     # env.py reads DATABASE_URL itself, but be explicit to handle the
     # rare case where a worker has a different env loaded.
     cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(cfg, "head")
+
+    if engine.dialect.name == "postgresql":
+        # 64-bit signed int; arbitrary but constant. Two replicas booting
+        # the same image use the same lock ID and serialize.
+        lock_id = 8439_2026_0427_0001
+        with engine.begin() as conn:
+            from sqlalchemy import text
+            conn.execute(text("SELECT pg_advisory_lock(:lock_id)"), {"lock_id": lock_id})
+            try:
+                command.upgrade(cfg, "head")
+            finally:
+                conn.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id})
+    else:
+        command.upgrade(cfg, "head")

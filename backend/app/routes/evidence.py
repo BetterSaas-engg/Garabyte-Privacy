@@ -178,16 +178,44 @@ async def upload_evidence(
         )
     ext = _ALLOWED_MIMES[mime]
 
-    # Streaming size check — read into the storage backend in 64KB chunks
-    # but bail at the cap. UploadFile is backed by a SpooledTemporaryFile
-    # so we can read it twice if needed; we don't, but we do enforce the
-    # size guard manually because UploadFile has no max_size.
-    raw = await file.read()
-    if len(raw) > settings.evidence_max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds {settings.evidence_max_bytes // (1024 * 1024)} MB cap",
-        )
+    # Audit-fix A6: stream-read with a running size counter into a
+    # spooled temp file. The previous implementation did `raw = await
+    # file.read()` then size-checked AFTER the entire payload was in
+    # memory — a 500 MB upload OOMed the worker before the 413 fired.
+    # Now we abort the loop the moment the counter exceeds the cap.
+    #
+    # SpooledTemporaryFile keeps small uploads in memory (rolls to disk
+    # only past max_size); typical Office/PDF docs stay in RAM.
+    import tempfile
+    cap = settings.evidence_max_bytes
+    chunk_size = 64 * 1024
+    spool = tempfile.SpooledTemporaryFile(max_size=2 * 1024 * 1024)  # 2 MB in-memory threshold
+    size = 0
+    first_bytes = b""
+    try:
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > cap:
+                spool.close()
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds {cap // (1024 * 1024)} MB cap",
+                )
+            if not first_bytes:
+                first_bytes = chunk[:32]
+            spool.write(chunk)
+    except HTTPException:
+        raise
+    except Exception:
+        spool.close()
+        raise
+
+    if size == 0:
+        spool.close()
+        raise HTTPException(status_code=400, detail="Empty upload")
 
     # Magic-byte check: refuse uploads whose contents disagree with the
     # reported MIME. The Content-Type header is fully attacker-controlled,
@@ -195,7 +223,8 @@ async def upload_evidence(
     # Content-Type: image/png and have the download path stream it back
     # for a stored-XSS chain. Plain text formats (txt/csv) skip the
     # signature check; size + extension cap them sufficiently.
-    if not _content_matches_mime(raw[:32], mime):
+    if not _content_matches_mime(first_bytes, mime):
+        spool.close()
         raise HTTPException(
             status_code=415,
             detail=(
@@ -204,9 +233,14 @@ async def upload_evidence(
             ),
         )
 
-    # Write to storage (UUID-named) — original filename never reaches disk
-    import io
-    storage_path = storage.put(io.BytesIO(raw), ext)
+    # Hand the spooled stream to storage; it copies in 64 KB chunks too,
+    # so we never hold the whole file in Python memory at once for
+    # anything beyond the 2 MB spool threshold.
+    spool.seek(0)
+    try:
+        storage_path = storage.put(spool, ext)
+    finally:
+        spool.close()
 
     # Replace any prior upload for this response.
     prior = (
@@ -224,7 +258,7 @@ async def upload_evidence(
         uploaded_by_id=user.id,
         original_filename=file.filename or "upload",
         mime_type=mime,
-        size_bytes=len(raw),
+        size_bytes=size,
         storage_path=storage_path,
     )
     db.add(ev)
@@ -238,7 +272,7 @@ async def upload_evidence(
         resource_kind="evidence_file", resource_id=ev.id, ip=_ip(request),
         context={
             "response_id": response_id,
-            "size_bytes": len(raw),
+            "size_bytes": size,
             "mime": mime,
             "filename": (file.filename or "")[:120],
         },
