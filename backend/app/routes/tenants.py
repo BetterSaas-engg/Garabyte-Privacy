@@ -348,6 +348,7 @@ def get_tenant_consultants(
         .filter(
             OrgMembership.org_id == tenant.id,
             OrgMembership.role == ROLE_CONSULTANT,
+            User.deleted_at.is_(None),  # A7: hide soft-deleted consultants
         )
         .order_by(User.email.asc())
         .all()

@@ -1,9 +1,11 @@
 # Audit follow-ups
 
 After the Phase 1–10 work, an independent code-reviewer pass turned up
-sixteen findings. Six were fixed in commit `120b8da`; A1–A4 (the four
-🟠 items below) were fixed in a follow-up commit. The remaining six 🟡
-items are tracked here so they're not forgotten.
+sixteen findings. Six were fixed in commit `120b8da`; A1–A4 in a
+follow-up; A5/A8/A11 + consultant-flow notifications in another;
+A6/A10 + A7 (user soft-delete) in subsequent rounds. All sixteen
+findings are now closed. This file is kept as the historical paper
+trail.
 
 Severity tier follows the same scheme as the original audit: 🔴 ship-
 blocker, 🟠 fix before customer GA, 🟡 next sprint.
@@ -22,26 +24,23 @@ blocker, 🟠 fix before customer GA, 🟡 next sprint.
 
 ## Still hanging
 
-### 🟡 Medium
+### 🟡 Medium — all closed
 
-**A5. `tenant_history` filters in Python.** `routes/tenants.py:get_tenant_history` lazy-loads every assessment then filters to `status == "completed"` in a list comp. Switch to a `.filter(Assessment.status == "completed").order_by(...)` query.
+**A5.** `tenant_history` switched to a SQL `.filter(...)` instead of lazy-load + Python list-comp. `routes/tenants.py`.
 
-**A6. `evidence_storage.put` reads the entire upload into memory before sizing.** `routes/evidence.py:upload_evidence` does `raw = await file.read()` and only then checks `len(raw) > evidence_max_bytes`. A 500 MB upload OOMs the worker before the 413 fires. Stream-read in chunks with a running size counter.
+**A6.** `evidence_storage.put` now reads in 64 KB chunks into a `SpooledTemporaryFile` (2 MB in-memory threshold), with a running size counter that aborts with 413 the moment the cap is exceeded. `routes/evidence.py:upload_evidence`. Empty uploads now return 400.
 
-**A7. `Response.answered_by_id` is `SET NULL` on user delete; user delete itself is not gated.** No `DELETE /users/{id}` exists today, so this is latent. When user-DSAR lands, deleting a User will null out `answered_by_id` across every historical response in every tenant they ever worked in, silently destroying the regulatory-defensibility chain M23 was supposed to provide. Add a soft-delete (`User.deleted_at`) instead of hard delete; preserve the FK.
+**A7.** `User.deleted_at` added (Alembic `c30fc25dcb6f`). `read_session`, login, magic-request, password-reset-request all reject soft-deleted users. New `DELETE /auth/users/{id}` (garabyte_admin only) sets `deleted_at`, revokes all sessions, refuses to delete the last live garabyte_admin. Re-accepting an invitation reactivates a soft-deleted user (clears `deleted_at` + logs `auth.user.reactivated`). Audit-log display projections still resolve soft-deleted users' email so the regulatory chain stays readable.
 
-**A8. `evidence_url` accepts plain HTTP in production.** `schemas/assessment.py` regex is `r"^https?://"`. Tighten to `^https://` in production via config.
+**A8.** `evidence_url` regex stays permissive (`^https?://`); a `field_validator` rejects plain http when `settings.app_env != "development"`. `schemas/assessment.py`.
 
-**A9. No bootstrap path for the first `garabyte_admin` membership.** `seed.py` creates demo tenants but no users; `bootstrap.py` exists but isn't invoked anywhere. First production deploy → no admin → no way to create a tenant via the API → only path is direct SQL. Document the bootstrap CLI invocation in `README.md` and `docs/dsar-runbook.md`.
+**A9.** Production bootstrap procedure documented in README's "First-time production deploy" section.
 
-**A10. `init_db` runs `alembic upgrade head` on every startup.** `database.py:init_db`. The docstring acknowledges the multi-replica race; Railway can scale to 2 instances under load. Add an advisory lock or move migrations to a release-phase command.
+**A10.** `init_db` wraps `alembic upgrade head` in a `pg_advisory_lock` on Postgres so concurrent replica boots serialize. `database.py:init_db`. SQLite path unchanged.
 
-**A11. `consultant.engagements.list` ignores assessments where the user is also an org admin of their own consultancy.** `routes/assessments.py` filters memberships to `m.role == ROLE_CONSULTANT`, which is correct for the cross-tenant case but drops the consultant's own org. Cosmetic for now but document the contract.
+**A11.** `consultant.engagements.list` docstring spells out the visibility contract — garabyte_admin sees all, consultant role sees that tenant only, other roles fall through to `/tenants`. `routes/assessments.py`.
 
-## Recommended fix order
+## All sixteen findings closed
 
-🟠 items (A1–A4) are now landed. Of the remaining 🟡 set, A6 is the
-largest scope (rewrite evidence upload to stream-read with a running
-size counter) — do it before raising the 10 MB file-size cap. A10
-(multi-replica migration race) is the only one that blocks production
-scaling; address before the second Railway instance.
+The audit pass that produced this list is fully addressed. New findings
+should go into a fresh document; this one is closed history.

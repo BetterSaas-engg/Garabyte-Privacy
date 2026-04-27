@@ -74,6 +74,19 @@ class User(Base):
     name = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Audit-fix A7: soft-delete instead of hard-delete. Hard-deleting a
+    # User would null out Response.answered_by_id and Finding annotation
+    # consultant_id rows across every tenant the user ever worked in,
+    # silently destroying the regulatory-defensibility chain that M23
+    # depends on. With deleted_at set, the row stays put — auth + listing
+    # queries filter it out, but the FK references stay valid and the
+    # audit log can still resolve "who answered question X in 2026."
+    deleted_at = Column(DateTime, nullable=True, index=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
     memberships = relationship(
         "OrgMembership",
         back_populates="user",

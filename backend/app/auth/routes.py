@@ -214,7 +214,7 @@ def verify_email(
         raise HTTPException(400, "Invalid or expired verification link")
 
     user = db.query(User).filter(User.id == row.user_id).first()
-    if not user:
+    if not user or user.deleted_at is not None:
         db.commit()
         raise HTTPException(400, "Invalid or expired verification link")
 
@@ -242,6 +242,13 @@ def login(
     """Verify password, create session, set cookie. Generic error on miss."""
     email = _normalize_email(payload.email)
     user = db.query(User).filter(User.email == email).first()
+    # Soft-deleted users (audit A7) cannot log in. Same generic error so
+    # we don't leak which emails have been deactivated.
+    if user is not None and user.deleted_at is not None:
+        log_access(db, user_id=user.id, action="auth.login.deleted",
+                   ip=_client_ip(request))
+        db.commit()
+        raise HTTPException(401, "Invalid email or password")
     ok = bool(user) and verify_password(payload.password, user.password_hash or "")
     if not ok:
         log_access(db, user_id=user.id if user else None, action="auth.login.fail",
@@ -335,6 +342,9 @@ def magic_request(
     """
     email = _normalize_email(payload.email)
     user = db.query(User).filter(User.email == email).first()
+    # Soft-deleted users (audit A7) don't get magic links. No-op silently.
+    if user and user.deleted_at is not None:
+        user = None
     if user and user.email_verified_at is not None:
         plaintext = mint_token(
             db,
@@ -373,7 +383,7 @@ def magic_consume(
         db.commit()
         raise HTTPException(400, "Invalid or expired sign-in link")
     user = db.query(User).filter(User.id == row.user_id).first()
-    if not user:
+    if not user or user.deleted_at is not None:
         db.commit()
         raise HTTPException(400, "Invalid or expired sign-in link")
     _send_session(db, request, response, user)
@@ -405,6 +415,9 @@ def password_reset_request(
 ) -> GenericMessage:
     email = _normalize_email(payload.email)
     user = db.query(User).filter(User.email == email).first()
+    # Soft-deleted users (audit A7) don't get reset links.
+    if user and user.deleted_at is not None:
+        user = None
     if user:
         plaintext = mint_token(
             db,
@@ -444,7 +457,7 @@ def password_reset_confirm(
         db.commit()
         raise HTTPException(400, "Invalid or expired reset link")
     user = db.query(User).filter(User.id == row.user_id).first()
-    if not user:
+    if not user or user.deleted_at is not None:
         db.commit()
         raise HTTPException(400, "Invalid or expired reset link")
     user.password_hash = hash_password(payload.new_password)
@@ -680,6 +693,13 @@ def accept_invitation(
     dimension_ids = row.payload.get("dimension_ids")
 
     user = db.query(User).filter(User.email == email).first()
+    # Soft-deleted users (audit A7) accepting a fresh invitation get
+    # reactivated — clear deleted_at so the rest of the flow treats it
+    # like a normal returning user. The new role/membership is added below.
+    if user is not None and user.deleted_at is not None:
+        user.deleted_at = None
+        log_access(db, user_id=user.id, action="auth.user.reactivated",
+                   ip=_client_ip(request))
     if user is None:
         if not payload.password:
             db.commit()
@@ -719,3 +739,82 @@ def accept_invitation(
                context={"role": role})
     db.commit()
     return _to_user_out(user)
+
+
+# ---------------------------------------------------------------------------
+# User soft-delete (audit A7) — garabyte_admin only
+# ---------------------------------------------------------------------------
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft-delete a user (audit A7). Sets `deleted_at`, revokes all
+    active sessions, and logs the action. The row stays in the DB so
+    that Response.answered_by_id and audit-log user_id references
+    keep resolving — the regulator's "who answered Q on date D" stays
+    answerable. Auth + listing surfaces filter on `deleted_at IS NULL`
+    so the user can't sign in or appear on customer-facing pages.
+
+    Garabyte admin only. Refuses to delete the last garabyte_admin —
+    you'd lock the platform. Re-activation happens implicitly when the
+    user accepts a fresh invitation.
+    """
+    from ..models import AuthSession, ROLE_GARABYTE_ADMIN
+
+    is_actor_garabyte_admin = any(
+        m.role == ROLE_GARABYTE_ADMIN for m in actor.memberships
+    )
+    if not is_actor_garabyte_admin:
+        log_access(db, user_id=actor.id, action="auth.user.delete.denied",
+                   resource_kind="user", resource_id=user_id,
+                   ip=_client_ip(request))
+        db.commit()
+        raise HTTPException(403, "Only Garabyte admins may delete users")
+
+    target = db.query(User).filter(User.id == user_id).first()
+    if target is None:
+        raise HTTPException(404, "User not found")
+    if target.deleted_at is not None:
+        # Idempotent — already soft-deleted.
+        return
+
+    target_is_admin = any(
+        m.role == ROLE_GARABYTE_ADMIN for m in target.memberships
+    )
+    if target_is_admin:
+        # Refuse to delete the last live garabyte_admin.
+        live_admins = (
+            db.query(User)
+            .join(OrgMembership, OrgMembership.user_id == User.id)
+            .filter(
+                OrgMembership.role == ROLE_GARABYTE_ADMIN,
+                User.deleted_at.is_(None),
+                User.id != target.id,
+            )
+            .distinct()
+            .count()
+        )
+        if live_admins == 0:
+            raise HTTPException(
+                400, "Refusing to delete the last active Garabyte admin",
+            )
+
+    snapshot = {
+        "email": target.email,
+        "name": target.name,
+        "membership_count": len(target.memberships),
+    }
+    target.deleted_at = datetime.utcnow()
+    revoked = db.query(AuthSession).filter(AuthSession.user_id == target.id).delete()
+    log_access(
+        db, user_id=actor.id, action="auth.user.delete",
+        resource_kind="user", resource_id=target.id,
+        ip=_client_ip(request),
+        context={**snapshot, "sessions_revoked": revoked},
+    )
+    db.commit()

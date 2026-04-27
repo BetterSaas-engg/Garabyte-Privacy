@@ -98,8 +98,9 @@ def create_session(
 
 def read_session(db: Session, session_id: str) -> Optional[AuthSession]:
     """
-    Look up a session by id. Returns None if missing, expired (absolute), or
-    idle-expired. On success, advances last_seen_at (caller must commit).
+    Look up a session by id. Returns None if missing, expired (absolute),
+    idle-expired, or if the underlying user has been soft-deleted (audit A7).
+    On success, advances last_seen_at (caller must commit).
     """
     if not session_id:
         return None
@@ -111,6 +112,10 @@ def read_session(db: Session, session_id: str) -> Optional[AuthSession]:
         return None
     idle_cutoff = now - timedelta(days=SESSION_IDLE_DAYS)
     if sess.last_seen_at < idle_cutoff:
+        return None
+    # Soft-deleted users have their session rejected immediately. The
+    # session row stays around for audit; cleanup runs out-of-band.
+    if sess.user is None or sess.user.deleted_at is not None:
         return None
     sess.last_seen_at = now
     return sess
