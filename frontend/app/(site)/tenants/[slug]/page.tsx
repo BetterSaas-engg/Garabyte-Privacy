@@ -8,10 +8,12 @@ import {
   getAssessmentResult,
   getRules,
   getTenant,
+  getTenantConsultants,
   getTenantHistory,
   isUnauthorized,
   whoami,
 } from "@/lib/api";
+import type { TenantConsultant } from "@/lib/api";
 import type {
   AssessmentResultOut,
   Dimension,
@@ -69,20 +71,23 @@ export default function TenantDashboard({
   const [findings, setFindings] = useState<FindingFromApi[] | null>(null);
   const [dimensionsByid, setDimensionsByid] = useState<Map<string, Dimension>>(new Map());
   const [canStart, setCanStart] = useState(false);
+  const [consultants, setConsultants] = useState<TenantConsultant[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [t, h, w, rules] = await Promise.all([
+        const [t, h, w, rules, cs] = await Promise.all([
           getTenant(slug),
           getTenantHistory(slug),
           whoami(),
           getRules(),
+          getTenantConsultants(slug),
         ]);
         setTenant(t);
         document.title = `${t.name} — Garabyte Privacy Health Check`;
         setHistory(h);
+        setConsultants(cs);
 
         const dMap = new Map<string, Dimension>();
         rules.dimensions.forEach((d) => dMap.set(d.id, d));
@@ -214,6 +219,22 @@ export default function TenantDashboard({
           </div>
         </div>
 
+        {/* Assigned consultant attribution. Shown whether or not there's
+            anything in flight — gives the customer a person to contact
+            instead of an opaque "Garabyte Consulting" handle. */}
+        {consultants.length > 0 && (
+          <div className="rounded-md border border-garabyte-ink-100 bg-white px-4 py-3 flex items-center gap-3">
+            <span className="text-[10.5px] uppercase tracking-[0.08em] text-garabyte-ink-500 font-medium">
+              {consultants.length === 1 ? "Your consultant" : "Your consultants"}
+            </span>
+            <span className="text-sm text-garabyte-ink-900">
+              {consultants
+                .map((c) => c.name || c.email)
+                .join(", ")}
+            </span>
+          </div>
+        )}
+
         {/* Awaiting consultant review banner */}
         {awaitingReview && (
           <div className="rounded-xl border border-garabyte-accent-300 bg-garabyte-accent-100/40 p-5">
@@ -225,7 +246,10 @@ export default function TenantDashboard({
               {latestItem?.completed_at
                 ? new Date(latestItem.completed_at).toLocaleDateString("en-CA")
                 : "—"}
-              . Your consultant is reviewing the engine&apos;s findings and will publish the report shortly.
+              .{" "}
+              {consultants.length > 0
+                ? `${consultants[0].name || consultants[0].email} is reviewing the engine's findings and will publish the report shortly.`
+                : "Your consultant is reviewing the engine's findings and will publish the report shortly."}{" "}
               You&apos;ll be notified by email when it&apos;s ready.
             </p>
           </div>

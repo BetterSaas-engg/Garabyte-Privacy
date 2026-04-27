@@ -3,7 +3,9 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from ..config import settings
 
 
 class AssessmentCreate(BaseModel):
@@ -46,11 +48,24 @@ class ResponseSubmit(BaseModel):
     # javascript:, file://, data:, etc. The 512-char cap matches the model
     # column length. Frontend should never render this URL without
     # treating it as untrusted user input.
+    #
+    # Audit-fix A8: in production, plain http:// is rejected too — the
+    # regex accepts both for dev convenience but the field_validator
+    # below tightens to https-only when app_env != "development".
     evidence_url: Optional[str] = Field(
         None,
         max_length=512,
         pattern=r"^https?://",
     )
+
+    @field_validator("evidence_url")
+    @classmethod
+    def _evidence_url_https_in_prod(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if settings.app_env != "development" and not v.startswith("https://"):
+            raise ValueError("evidence_url must use https:// in production")
+        return v
 
     @model_validator(mode="after")
     def _value_xor_skipped(self) -> "ResponseSubmit":

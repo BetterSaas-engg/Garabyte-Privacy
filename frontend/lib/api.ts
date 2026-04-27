@@ -112,6 +112,16 @@ export function createTenant(payload: TenantCreate): Promise<Tenant> {
   });
 }
 
+export interface TenantConsultant {
+  user_id: number;
+  email: string;
+  name: string | null;
+}
+
+export function getTenantConsultants(slug: string): Promise<TenantConsultant[]> {
+  return apiRequest<TenantConsultant[]>(`/tenants/${slug}/consultants`);
+}
+
 export function getTenantHistory(slug: string): Promise<TenantHistoryItem[]> {
   return apiRequest<TenantHistoryItem[]>(`/tenants/${slug}/history`);
 }

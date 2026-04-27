@@ -116,6 +116,17 @@ def list_engagements(
     Garabyte admin. Other roles see an empty list (use /tenants for the
     customer-side dashboard instead).
 
+    Visibility contract (audit A11):
+      - garabyte_admin → every tenant's assessments, regardless of any
+        other memberships the user may hold. R&P C4 cross-tenant elevation
+        applies; the membership.check log on each tenant access tracks it.
+      - consultant role on tenant T → that tenant's assessments only.
+      - any OTHER role on a tenant (including org_admin of the consultant's
+        own consultancy) → NOT included. This is intentional: the
+        consultant home is a cross-tenant work queue, not a "places I have
+        access to" listing. If the consultant is also an org_admin of
+        their own org's tenant, that tenant shows up via /tenants instead.
+
     Each row carries the bits the consultant home needs to triage:
     score, completed-at, published-at, and finding counts. Sorted so
     "needs the most attention" lands at the top: newest unpublished
@@ -635,6 +646,17 @@ def finalize_assessment(
     db.commit()
     db.refresh(assessment)
 
+    # Notify assigned consultants that there's something to review. Failure
+    # here is logged + swallowed (notifications.py owns that contract); we
+    # still return the score to the customer either way.
+    from ..services.notifications import notify_assessment_scored
+    tenant = db.query(Tenant).filter(Tenant.id == assessment.tenant_id).first()
+    if tenant is not None:
+        notify_assessment_scored(
+            db, assessment=assessment, tenant=tenant, submitter_id=user.id,
+        )
+        db.commit()
+
     return AssessmentResultOut(assessment=assessment, result=result_dict)
 
 
@@ -834,6 +856,9 @@ def publish_assessment(
     if existing and existing.unpublished_at is None:
         return existing
 
+    from ..services.notifications import notify_assessment_published
+    tenant = db.query(Tenant).filter(Tenant.id == a.tenant_id).first()
+
     if existing:
         # Republish path — bump version, revoke old share links.
         existing.version = (existing.version or 1) + 1
@@ -848,6 +873,14 @@ def publish_assessment(
                    context={"version": existing.version, "revoked_links": revoked},
                    ip=_ip(request))
         db.commit()
+        # Notify org admins + viewers (republish counts as "the report is
+        # ready again" — they need to know to look).
+        if tenant is not None:
+            notify_assessment_published(
+                db, assessment=a, tenant=tenant,
+                publisher_id=user.id, cover_note=payload.cover_note,
+            )
+            db.commit()
         db.refresh(existing)
         return existing
 
@@ -865,6 +898,12 @@ def publish_assessment(
                context={"version": 1},
                ip=_ip(request))
     db.commit()
+    if tenant is not None:
+        notify_assessment_published(
+            db, assessment=a, tenant=tenant,
+            publisher_id=user.id, cover_note=payload.cover_note,
+        )
+        db.commit()
     db.refresh(pub)
     return pub
 

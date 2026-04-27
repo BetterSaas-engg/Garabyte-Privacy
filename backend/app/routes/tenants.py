@@ -1,5 +1,7 @@
 """Tenant management endpoints. All endpoints require auth (Phase 3)."""
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -264,8 +266,23 @@ def get_tenant_history(
         action="tenant.history.read",
     )
 
-    completed = [a for a in tenant.assessments if a.status == "completed"]
-    completed.sort(key=lambda a: a.completed_at or a.started_at)
+    # Audit-fix A5: filter at the SQL layer instead of lazy-loading every
+    # assessment then list-comp'ing in Python. published_at is read from
+    # the publication relationship in the loop below; SQLAlchemy
+    # batches that lookup once Assessment.publication is on the orm.
+    from ..models import Assessment
+    completed = (
+        db.query(Assessment)
+        .filter(
+            Assessment.tenant_id == tenant.id,
+            Assessment.status == "completed",
+        )
+        .order_by(
+            Assessment.completed_at.asc().nullsfirst(),
+            Assessment.started_at.asc(),
+        )
+        .all()
+    )
 
     log_access(db, user_id=user.id, org_id=tenant.id, action="tenant.history.read",
                context={"count": len(completed)},
@@ -282,4 +299,65 @@ def get_tenant_history(
             published_at=a.published_at,
         )
         for a in completed
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Consultants assigned to the tenant — used by the customer-facing dashboard
+# to show "Reviewed by Sarah L., privacy consultant" once published, and
+# "Awaiting consultant review by Sarah L." while pending.
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel as _PydBase, ConfigDict as _PydConfig
+
+
+class TenantConsultantOut(_PydBase):
+    user_id: int
+    email: str
+    name: Optional[str]
+
+    model_config = _PydConfig(from_attributes=True)
+
+
+@router.get("/{slug}/consultants", response_model=list[TenantConsultantOut])
+def get_tenant_consultants(
+    slug: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Consultants assigned to this tenant. Used by the customer-side
+    dashboard so org admins / viewers can see who's reviewing their
+    submissions. Same membership requirement as reading the tenant
+    itself — visibility is symmetric in both directions.
+    """
+    tenant = db.query(Tenant).filter(Tenant.slug == slug).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Tenant not found: {slug}")
+    ensure_membership(
+        db, user, tenant.id,
+        roles=_TENANT_READ_ROLES,
+        request=request,
+        action="tenant.consultants.read",
+    )
+
+    rows = (
+        db.query(User)
+        .join(OrgMembership, OrgMembership.user_id == User.id)
+        .filter(
+            OrgMembership.org_id == tenant.id,
+            OrgMembership.role == ROLE_CONSULTANT,
+        )
+        .order_by(User.email.asc())
+        .all()
+    )
+    log_access(db, user_id=user.id, org_id=tenant.id,
+               action="tenant.consultants.read",
+               context={"count": len(rows)},
+               ip=request.client.host if request.client else None)
+    db.commit()
+    return [
+        TenantConsultantOut(user_id=u.id, email=u.email, name=u.name)
+        for u in rows
     ]
