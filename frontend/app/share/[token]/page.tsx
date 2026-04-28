@@ -67,7 +67,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
       {report.published_at && (
         <p className="text-[12.5px] text-[#6B7280] mb-6">
           Published {new Date(report.published_at).toLocaleDateString()} ·
-          Reviewed by Garabyte Consulting
+          Reviewed by a Garabyte consultant
         </p>
       )}
 

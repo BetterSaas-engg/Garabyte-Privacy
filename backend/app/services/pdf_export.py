@@ -162,7 +162,7 @@ def render_assessment_pdf(
         meta_parts.append(_esc(assessment_label))
     if published_at:
         meta_parts.append(f"Published {published_at.strftime('%B %d, %Y')}")
-    meta_parts.append("Reviewed by Garabyte Consulting")
+    meta_parts.append("Reviewed by a Garabyte consultant")
     flow.append(Paragraph(" · ".join(meta_parts), s["meta"]))
 
     # Cover note

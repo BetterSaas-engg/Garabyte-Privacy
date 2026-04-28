@@ -63,7 +63,7 @@ export function LandingPage() {
               Privacy maturity assessment
               <span className="text-garabyte-ink-300 mx-2">·</span>
               <span className="text-garabyte-ink-500 normal-case tracking-normal">
-                Co-designed with Garabyte Consulting
+                By Garabyte
               </span>
             </p>
             <h1 className="text-display text-garabyte-primary-800 mb-5 leading-[1.05]">
@@ -244,7 +244,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Co-designed callout */}
+      {/* Practice callout — what this product is, in our voice */}
       <section className="px-6 py-14 bg-garabyte-cream-100/60 border-y border-garabyte-ink-100">
         <div className="max-w-5xl mx-auto grid md:grid-cols-[200px_1fr] gap-6 items-start">
           <div>
@@ -252,15 +252,15 @@ export function LandingPage() {
               <span className="w-7 h-7 rounded-md bg-garabyte-primary-800 text-white flex items-center justify-center text-sm font-medium">
                 g
               </span>
-              <span className="text-sm font-medium text-garabyte-primary-800">Garabyte Consulting</span>
+              <span className="text-sm font-medium text-garabyte-primary-800">Garabyte</span>
             </div>
-            <p className="text-xs text-garabyte-ink-500">Co-designed with</p>
+            <p className="text-xs text-garabyte-ink-500">Built by our privacy practice</p>
           </div>
           <p className="text-base text-garabyte-ink-700 leading-relaxed max-w-2xl">
-            The scoring rubric, the question set, and the regulatory mappings were built with
-            Garabyte Consulting’s privacy practice. Their team works with Canadian and EU
-            organizations on PIPEDA, Law 25, and GDPR programs. The findings this product
-            produces are the ones their consultants would write by hand — structured, scored,
+            We work with Canadian and EU organizations on PIPEDA, Law 25, and GDPR
+            programs. The scoring rubric, the question set, and the regulatory
+            mappings reflect that practice — the findings this product produces
+            are the ones our consultants would write by hand, structured, scored,
             and ready to defend.
           </p>
         </div>

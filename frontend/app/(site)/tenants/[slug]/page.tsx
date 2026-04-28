@@ -254,8 +254,8 @@ export default function TenantDashboard({
         </div>
 
         {/* Assigned consultant attribution. Shown whether or not there's
-            anything in flight — gives the customer a person to contact
-            instead of an opaque "Garabyte Consulting" handle. */}
+            anything in flight — gives the customer a real person to
+            contact instead of a generic Garabyte handle. */}
         {consultants.length > 0 && (
           <div className="rounded-md border border-garabyte-ink-100 bg-white px-4 py-3 flex items-center gap-3">
             <span className="text-[10.5px] uppercase tracking-[0.08em] text-garabyte-ink-500 font-medium">

@@ -143,7 +143,7 @@ export default function SamplePage() {
           <span className="font-mono text-xs text-garabyte-ink-500">{REPORT_VERSION}</span>
         </div>
         <p className="text-sm text-garabyte-ink-500 mb-8">
-          Reviewed by Garabyte Consulting · Published April 2026
+          Reviewed by a Garabyte consultant · Published April 2026
         </p>
 
         {/* Overall score */}

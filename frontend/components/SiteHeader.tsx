@@ -53,7 +53,7 @@ export function SiteHeader() {
           </p>
         </Link>
         <div className="flex items-center gap-4 text-xs text-garabyte-ink-500">
-          <p className="hidden sm:block">Co-designed with Garabyte Consulting</p>
+          <p className="hidden sm:block">Privacy maturity assessment</p>
           {checked && (
             me ? (
               <div className="flex items-center gap-3">

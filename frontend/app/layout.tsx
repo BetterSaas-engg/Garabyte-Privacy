@@ -7,11 +7,11 @@ export const metadata: Metadata = {
     template: "%s — Garabyte Privacy Health Check",
   },
   description:
-    "Privacy program maturity assessment co-designed with Garabyte Consulting. Eight dimensions mapped to PIPEDA, Quebec Law 25, CASL, GDPR, and emerging AI governance standards.",
+    "Privacy program maturity assessment by Garabyte. Eight dimensions mapped to PIPEDA, Quebec Law 25, CASL, GDPR, and emerging AI governance standards.",
   openGraph: {
     title: "Garabyte Privacy Health Check",
     description:
-      "Know where your privacy program stands. Know where to go next. Co-designed with Garabyte Consulting.",
+      "Know where your privacy program stands. Know where to go next. By Garabyte.",
     type: "website",
   },
   robots: {

@@ -106,8 +106,7 @@ export default function Home() {
           </h1>
           <p className="text-base text-garabyte-ink-700 leading-relaxed max-w-2xl">
             An 8-dimension maturity assessment mapped to PIPEDA, Quebec Law 25,
-            CASL, GDPR, and emerging AI governance standards. Co-designed with
-            Garabyte Consulting.
+            CASL, GDPR, and emerging AI governance standards.
           </p>
         </section>
 

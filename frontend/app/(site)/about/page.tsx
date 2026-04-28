@@ -3,7 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "About",
   description:
-    "About the Garabyte Privacy Health Check — what it is, who it's for, and how it relates to Garabyte Consulting.",
+    "About the Garabyte Privacy Health Check — what it is, who it's for, and how Garabyte built it.",
 };
 
 export default function AboutPage() {
@@ -33,17 +33,17 @@ export default function AboutPage() {
             specific regulatory citations.
           </p>
           <p>
-            The platform was co-designed with Garabyte Consulting&apos;s
-            privacy practice. The scoring rubric, question set, regulatory
-            mappings, and remediation guidance are the same ones their
-            consultants would write by hand — structured, scored, and ready
-            to defend. Engagements typically combine the platform&apos;s
-            output with a consultant&apos;s review to produce a remediation
-            plan the customer can act on.
+            We built the platform from our privacy practice. The scoring
+            rubric, question set, regulatory mappings, and remediation
+            guidance are the same ones our consultants would write by
+            hand — structured, scored, and ready to defend. Engagements
+            typically combine the platform&apos;s output with a
+            consultant&apos;s review to produce a remediation plan the
+            customer can act on.
           </p>
           <p>
             The product is invitation-only. Customers come through a
-            Garabyte sales conversation; the platform handles the
+            sales conversation with us; the platform handles the
             assessment, the consultant&apos;s review, and the published
             report. See the{" "}
             <Link href="/sample" className="text-garabyte-primary-500 hover:text-garabyte-primary-700">
@@ -57,7 +57,7 @@ export default function AboutPage() {
           </p>
         </div>
         <p className="text-[11px] text-garabyte-ink-300 mt-10 text-center">
-          Co-designed with Garabyte Consulting.
+          Built by Garabyte.
         </p>
       </article>
     </main>

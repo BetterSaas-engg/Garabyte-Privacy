@@ -41,8 +41,9 @@ app = FastAPI(
     title="Garabyte Privacy Health Check",
     version="0.1.0",
     description=(
-        "Privacy program maturity assessment platform. "
-        "Built in partnership with Garabyte Consulting."
+        "Privacy program maturity assessment platform — "
+        "Garabyte's tool for scoring client privacy programs against "
+        "PIPEDA, Quebec Law 25, CASL, GDPR, CCPA, and AIDA."
     ),
 )
 

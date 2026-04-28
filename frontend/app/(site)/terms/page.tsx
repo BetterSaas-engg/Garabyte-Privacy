@@ -20,10 +20,10 @@ export default function TermsPage() {
 
         <div className="text-[14px] text-garabyte-ink-700 leading-relaxed space-y-5">
           <p>
-            The Garabyte Privacy Health Check is provided by Garabyte
-            Consulting. By using the platform you agree to the engagement
-            agreement signed with Garabyte and to the terms below; if a
-            conflict arises, the engagement agreement controls.
+            The Garabyte Privacy Health Check is provided by Garabyte. By
+            using the platform you agree to the engagement agreement signed
+            with us and to the terms below; if a conflict arises, the
+            engagement agreement controls.
           </p>
 
           <Section title="Eligibility">

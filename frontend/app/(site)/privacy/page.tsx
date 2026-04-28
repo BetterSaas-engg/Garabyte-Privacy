@@ -36,9 +36,8 @@ export default function PrivacyPage() {
             This notice covers the data the Garabyte Privacy Health Check
             platform itself collects and stores about your organization.
             It is the privacy posture of the product — distinct from
-            Garabyte Consulting&apos;s broader practice, which has its
-            own retention and handling rules described in your engagement
-            contract.
+            our broader consulting practice, which has its own retention
+            and handling rules described in your engagement contract.
           </p>
         </Section>
 
@@ -191,7 +190,7 @@ export default function PrivacyPage() {
         </Section>
 
         <p className="text-[11px] text-garabyte-ink-300 mt-12 text-center">
-          Garabyte Privacy Health Check · co-designed with Garabyte Consulting
+          Garabyte Privacy Health Check · Built by Garabyte
         </p>
       </article>
     </main>
