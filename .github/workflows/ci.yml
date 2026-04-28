@@ -13,6 +13,27 @@ jobs:
       run:
         working-directory: backend
 
+    # Postgres service for the alembic-check step. SQLite's FK reflection
+    # in SQLAlchemy 2.0 doesn't expose ON DELETE clauses, so `alembic check`
+    # against SQLite reports false positives for every model FK that
+    # declares ondelete=. Postgres reflects FKs faithfully, and is also
+    # what runs in production (Railway), so this is the right engine to
+    # validate migrations against.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: garabyte_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +46,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Verify Alembic migrations apply to a fresh DB
+      - name: Verify Alembic migrations apply to a fresh Postgres
         env:
-          DATABASE_URL: sqlite:///./ci_alembic.db
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/garabyte_ci
         run: |
           alembic upgrade head
           alembic check  # fails if model metadata diverges from migrations
 
       - name: Pytest suite
+        # Pytest stays on SQLite for speed; the alembic step above already
+        # validated the migrations against the production-equivalent engine.
         run: pytest -ra
 
       # Legacy script-style smoke tests. Kept around because they exercise

@@ -24,8 +24,12 @@ def upgrade() -> None:
         # server_default='0' so existing rows backfill cleanly. Drop the
         # default after the column is in place; new inserts come from the
         # ORM with an explicit value.
+        # sa.false() renders as `false` on Postgres and `0` on SQLite, so
+        # the same migration works on both engines. Plain sa.text('0')
+        # passes on SQLite but Postgres rejects it ("column is of type
+        # boolean but default expression is of type integer").
         batch_op.add_column(
-            sa.Column('skipped', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+            sa.Column('skipped', sa.Boolean(), nullable=False, server_default=sa.false()),
         )
         batch_op.add_column(sa.Column('skip_reason', sa.String(length=32), nullable=True))
         batch_op.alter_column('value', existing_type=sa.INTEGER(), nullable=True)
