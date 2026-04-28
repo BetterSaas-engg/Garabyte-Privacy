@@ -116,7 +116,7 @@ const SEVERITY_LABEL: Record<Severity, string> = {
 export const metadata = {
   title: "Sample report",
   description:
-    "An example Garabyte Privacy Health Check report — Acme Corp, scored across the eight privacy dimensions and mapped to PIPEDA, Law 25, GDPR, CCPA, and AIDA.",
+    "An example Garabyte Privacy Health Check report — Acme Corp, scored across the eight privacy dimensions and mapped to PIPEDA, Law 25, GDPR, CCPA, and the anticipated AIDA framework.",
 };
 
 export default function SamplePage() {

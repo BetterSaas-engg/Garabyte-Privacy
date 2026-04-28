@@ -43,7 +43,7 @@ app = FastAPI(
     description=(
         "Privacy program maturity assessment platform — "
         "Garabyte's tool for scoring client privacy programs against "
-        "PIPEDA, Quebec Law 25, CASL, GDPR, CCPA, and AIDA."
+        "PIPEDA, Quebec Law 25, CASL, GDPR, CCPA, and Canada's anticipated AIDA."
     ),
 )
 

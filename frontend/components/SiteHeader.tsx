@@ -41,10 +41,22 @@ export function SiteHeader() {
     }
   }
 
+  // Marketing nav only renders on the public-facing pages — landing,
+  // sample, about, privacy, terms, contact. Auth pages and authenticated
+  // dashboards skip it to keep the chrome focused on the task at hand.
+  const isMarketingPath =
+    pathname === "/" ||
+    pathname === "/sample" ||
+    pathname === "/about" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/contact";
+  const showMarketingNav = isMarketingPath && checked && !me;
+
   return (
     <header className="border-b border-garabyte-ink-100 bg-garabyte-cream-50/80 backdrop-blur-sm sticky top-0 z-10">
-      <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-        <Link href="/" className="group">
+      <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+        <Link href="/" className="group flex-shrink-0">
           <p className="text-xs uppercase tracking-[0.18em] text-garabyte-primary-500 font-medium">
             Garabyte
           </p>
@@ -52,8 +64,32 @@ export function SiteHeader() {
             Privacy Health Check
           </p>
         </Link>
+
+        {/* Marketing nav — anchor links scroll within the landing page; on
+            other public pages (privacy/terms/etc) they navigate home and
+            scroll once there. Small screens fall back to the right-rail
+            CTA only. */}
+        {showMarketingNav && (
+          <nav className="hidden md:flex items-center gap-5 text-[12.5px] text-garabyte-ink-700">
+            <Link href="/#dimensions" className="hover:text-garabyte-primary-700 transition-colors">
+              Dimensions
+            </Link>
+            <Link href="/#coverage" className="hover:text-garabyte-primary-700 transition-colors">
+              Coverage
+            </Link>
+            <Link href="/#how-it-works" className="hover:text-garabyte-primary-700 transition-colors">
+              How it works
+            </Link>
+            <Link href="/sample" className="hover:text-garabyte-primary-700 transition-colors">
+              Sample report
+            </Link>
+          </nav>
+        )}
+
         <div className="flex items-center gap-4 text-xs text-garabyte-ink-500">
-          <p className="hidden sm:block">Privacy maturity assessment</p>
+          {!showMarketingNav && (
+            <p className="hidden sm:block">Privacy maturity assessment</p>
+          )}
           {checked && (
             me ? (
               <div className="flex items-center gap-3">

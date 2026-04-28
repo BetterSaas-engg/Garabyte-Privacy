@@ -31,7 +31,7 @@ const REGULATIONS = [
   { name: "CASL", body: "Canadian Radio-television and Telecommunications Commission" },
   { name: "GDPR", body: "European Data Protection Board" },
   { name: "CCPA", body: "California Privacy Protection Agency" },
-  { name: "AIDA", body: "Artificial Intelligence and Data Act (Canada)" },
+  { name: "AIDA (anticipated)", body: "Artificial Intelligence and Data Act — Canadian Bill C-27, not yet in force" },
 ];
 
 const SAMPLE_DIMENSIONS = [
@@ -71,7 +71,8 @@ export function LandingPage() {
             </h1>
             <p className="text-base text-garabyte-ink-700 leading-relaxed max-w-xl mb-8">
               A scored, defensible read on your program against PIPEDA, Quebec Law 25,
-              CASL, GDPR, CCPA, and AIDA — in about 40 minutes.
+              CASL, GDPR, CCPA, and Canada&apos;s anticipated AIDA — in about
+              40 minutes.
             </p>
             <div className="flex flex-wrap items-center gap-3 mb-3">
               <Link

@@ -1,6 +1,6 @@
 # Garabyte Privacy Health Check
 
-Garabyte's SaaS platform for scoring a client organization's privacy program maturity across 8 dimensions, producing a prioritized gap report, and mapping findings to specific regulations (PIPEDA, Quebec Law 25, CASL, GDPR, CCPA, AIDA).
+Garabyte's SaaS platform for scoring a client organization's privacy program maturity across 8 dimensions, producing a prioritized gap report, and mapping findings to specific regulations (PIPEDA, Quebec Law 25, CASL, GDPR, CCPA, and Canada's anticipated AIDA).
 
 ## Architecture
 

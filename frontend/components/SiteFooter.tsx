@@ -44,7 +44,7 @@ export function SiteFooter() {
         </div>
         <p className="text-xs text-garabyte-ink-500">
           © {new Date().getFullYear()} Garabyte. Maturity assessment ·
-          PIPEDA · Quebec Law 25 · CASL · GDPR · CCPA · AIDA
+          PIPEDA · Quebec Law 25 · CASL · GDPR · CCPA · AIDA (anticipated)
         </p>
       </div>
     </footer>

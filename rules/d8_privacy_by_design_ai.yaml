@@ -94,7 +94,7 @@ questions:
       - value: 3
         label: Joint privacy and algorithmic risk assessment for all AI systems
       - value: 4
-        label: Comprehensive AI impact assessment aligned with ISO 42001 and AIDA
+        label: Comprehensive AI impact assessment aligned with ISO 42001 and the anticipated AIDA framework
 
   - id: d8_q4
     text: Are privacy requirements embedded in the software development lifecycle?
@@ -135,7 +135,8 @@ gap_remediation_library:
     recommendation: >
       Establish a PIA process and trigger criteria within 90 days. Build a
       baseline inventory of AI systems with risk classification. This is a
-      rapidly intensifying regulator focus area with both Law 25 and AIDA.
+      rapidly intensifying regulator focus area, both under Law 25 and the
+      anticipated AIDA framework.
     regulatory_risk: Law 25 s. 3.3 requires PIAs for high-risk projects; non-compliance is structural and highly visible.
     typical_consulting_hours: 48
     upsell_hook: Natural fit for dedicated PIA automation platform — the organization would benefit from purpose-built tooling.
