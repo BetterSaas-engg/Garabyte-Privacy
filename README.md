@@ -131,17 +131,23 @@ The full list with defaults lives in [backend/.env.example](backend/.env.example
 ### 3. Deploy the frontend on Vercel
 
 1. New Project → import the same GitHub repo.
-2. Vercel reads [vercel.json](vercel.json) and runs the build/install
-   commands from the `frontend/` subdirectory. Framework is detected as
-   Next.js automatically. Node version is pinned to 20 by
+2. **Set the Root Directory to `frontend`** in the project setup screen
+   (or under Settings → General → Root Directory after import). This is
+   required — the repo is a monorepo and Vercel needs to know which
+   subdirectory holds the Next.js app. Once set, Vercel auto-detects
+   Next.js, runs `npm ci` + `npm run build` from `frontend/`, and serves
+   `frontend/.next`. Node version is pinned to 20 via
    [frontend/.nvmrc](frontend/.nvmrc).
-3. Set the one required env var:
+3. [vercel.json](vercel.json) at the repo root pins framework + build
+   commands and disables Vercel preview deployments for `dependabot/*`
+   branches (silences a dozen failing previews per dependency bump).
+4. Set the one required env var:
 
    | Variable | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://<your-railway-app>.up.railway.app` |
 
-4. Deploy. Once the Vercel URL is live, go back to Railway and add it
+5. Deploy. Once the Vercel URL is live, go back to Railway and add it
    to `CORS_ALLOWED_ORIGINS` and `FRONTEND_BASE_URL`, then redeploy the
    backend.
 
