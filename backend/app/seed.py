@@ -14,6 +14,7 @@ Run from the backend/ directory with the venv active:
     python -m app.seed
 """
 
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -23,6 +24,15 @@ from .database import SessionLocal, init_db
 from .models import Tenant, Assessment, Response
 from .services.rules_loader import load_rules_library
 from .services.scoring import score_assessment
+
+
+def _refuse_in_production() -> None:
+    """Hard-stop if APP_ENV=production. Demo tenants must never reach a real DB."""
+    if os.environ.get("APP_ENV", "").strip().lower() == "production":
+        raise SystemExit(
+            "Refusing to seed: APP_ENV=production. "
+            "seed.py is a dev/demo helper and must never run against a prod DB."
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -138,6 +148,7 @@ def seed_tenant(
     Create or replace a single synthetic tenant with historical + current
     completed assessments.
     """
+    _refuse_in_production()
     # Wipe any existing tenant with this slug (fresh seed every run)
     existing = db.query(Tenant).filter(Tenant.slug == slug).first()
     if existing:
@@ -226,6 +237,7 @@ def clear_api_test_tenant(db: Session) -> None:
 
 
 def main() -> None:
+    _refuse_in_production()
     print("Initializing database...")
     init_db()
 

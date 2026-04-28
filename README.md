@@ -65,81 +65,113 @@ App: <http://localhost:3000>
 
 ```bash
 cd backend
-.venv/bin/python test_rules_loader.py
-.venv/bin/python test_scoring.py
-.venv/bin/python test_database.py
-.venv/bin/python test_end_to_end.py
+pytest -ra
 ```
 
-CI runs the same scripts on every PR. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI runs `pytest` plus a "legacy smoke" pass over the older `test_*.py` scripts on every PR. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-## First-time production deploy
+## Deployment (Railway + Vercel)
 
-The local Quickstart above doesn't translate 1:1 to production. The
-operational gotchas, in the order you'll hit them:
+The intended deploy targets are **Railway** (backend + Postgres) and
+**Vercel** (Next.js frontend), driven from a private GitHub repo.
+Both platforms read config from files in this repo
+([railway.toml](railway.toml), [backend/Dockerfile](backend/Dockerfile),
+[vercel.json](vercel.json)) so most of the setup is just clicks.
 
-### 1. Apply the latest migrations
+### 1. Push to GitHub
 
-`init_db()` runs `alembic upgrade head` on backend startup, so a fresh
-deploy will migrate itself. For multi-replica deploys, move this to a
-release-phase command — `init_db()` has no advisory lock yet
-(audit follow-up A10), so two boot-time migrations can race.
+Standard `git remote add origin … && git push -u origin main`. Repo is
+expected to be **private** — `backend/app/seed.py` is committed for
+local-dev convenience and is guarded against running with
+`APP_ENV=production`, but a private repo keeps the synthetic-tenant
+fixtures off the public internet.
 
-### 2. Bootstrap the first `garabyte_admin`
+### 2. Deploy the backend on Railway
 
-The seed script populates demo tenants but no users. Without a
-`garabyte_admin` membership, no one can create real tenants via the API
-— the only path is direct SQL. Run the bootstrap CLI on the production
-backend container exactly once:
+1. New Project → "Deploy from GitHub repo" → pick this repo.
+2. Railway auto-detects [railway.toml](railway.toml), which points at
+   [backend/Dockerfile](backend/Dockerfile). No build config needed.
+3. Add a **Postgres** add-on. Railway exposes its connection string as
+   the `DATABASE_URL` env var on the backend service automatically.
+4. Set the env vars in the table below.
+5. Deploy. The container's `CMD` starts uvicorn; on first boot
+   `init_db()` runs `alembic upgrade head` automatically, so the schema
+   comes up empty-but-migrated.
+6. Open a shell on the backend service and bootstrap the first admin:
+   ```bash
+   APP_ENV=production python -m app.bootstrap \
+     --email "you@garabyte.com" \
+     --password 'a long passphrase'
+   ```
+   `--email` and `--password` are required under `APP_ENV=production`
+   (the bootstrap CLI refuses the dev defaults). Change the password
+   after first sign-in via the in-product reset flow.
+
+#### Required Railway env vars
+
+| Variable | Required | Example | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | yes | (auto from Postgres add-on) | Don't set by hand. |
+| `APP_ENV` | yes | `production` | Activates the seed/bootstrap guards. |
+| `LOG_LEVEL` | no | `INFO` | |
+| `CORS_ALLOWED_ORIGINS` | yes | `https://app.garabyte.com` | Comma-separated. Include the Vercel URL. |
+| `FRONTEND_BASE_URL` | yes | `https://app.garabyte.com` | Used in invite/reset email links. |
+| `EMAIL_BACKEND` | yes | `smtp` | Default `stdout` is dev-only. |
+| `SMTP_HOST` | if smtp | `smtp.postmarkapp.com` | |
+| `SMTP_PORT` | if smtp | `587` | |
+| `SMTP_USER` | if smtp | … | |
+| `SMTP_PASSWORD` | if smtp | … | |
+| `EMAIL_FROM` | yes | `Garabyte Privacy <no-reply@garabyte.com>` | The `From:` domain should match `SMTP_USER`'s domain so DMARC doesn't add "via …" decorations. |
+| `EMAIL_REPLY_TO` | no | `support@garabyte.com` | |
+| `EVIDENCE_STORAGE_DIR` | no | `./evidence_files` | See "Known limitations" below. |
+| `EVIDENCE_MAX_BYTES` | no | `10485760` | 10 MB default. |
+
+The full list with defaults lives in [backend/.env.example](backend/.env.example).
+
+### 3. Deploy the frontend on Vercel
+
+1. New Project → import the same GitHub repo.
+2. Vercel reads [vercel.json](vercel.json) and runs the build/install
+   commands from the `frontend/` subdirectory. Framework is detected as
+   Next.js automatically. Node version is pinned to 20 by
+   [frontend/.nvmrc](frontend/.nvmrc).
+3. Set the one required env var:
+
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_API_URL` | `https://<your-railway-app>.up.railway.app` |
+
+4. Deploy. Once the Vercel URL is live, go back to Railway and add it
+   to `CORS_ALLOWED_ORIGINS` and `FRONTEND_BASE_URL`, then redeploy the
+   backend.
+
+### 4. Smoke-test
 
 ```bash
-# Railway: open a shell on the backend service and run
-python -m app.bootstrap --email "you@garabyte.com"
-
-# Prints a generated password. Copy it; we don't store the plaintext
-# anywhere recoverable. Change it after first login via password reset.
-```
-
-`--seed-memberships` is for local dev only — it adds `org_admin` rows
-on the demo tenants. Don't pass it in production.
-
-### 3. Configure SMTP
-
-Default `EMAIL_BACKEND=stdout` prints invitations to the uvicorn
-terminal — fine for local dev, useless in production. Set:
-
-```
-EMAIL_BACKEND=smtp
-SMTP_HOST=...               # e.g. smtp.postmarkapp.com
-SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASSWORD=...
-EMAIL_FROM="Garabyte Privacy <no-reply@your-domain>"
-```
-
-The visible `From` domain should match the `SMTP_USER`'s domain so DMARC
-doesn't add "via …" decorations to invitations.
-
-### 4. Seed (or skip the seed)
-
-`python -m app.seed` populates three synthetic demo tenants
-(`northwind-utilities`, `meridian-health`, `cascade-telecom`) marked
-`is_demo=1`. Skip in production unless you want them visible in the
-garabyte_admin's tenant list.
-
-### 5. Smoke-test
-
-After deploy:
-
-```bash
-curl https://api.your-domain/health
+curl https://<your-railway-app>.up.railway.app/health
 # → {"status":"ok", ...}
-
-# Sign in as the bootstrap admin via the frontend, create a test tenant,
-# invite a colleague to your own email, accept the invite, run an
-# assessment to completion, score it. The full flow exercises every
-# major code path.
 ```
+
+Then in the browser: sign in as the bootstrap admin → create a test
+tenant → invite a colleague (or yourself) → accept the invite → run
+an assessment to completion → score it. That flow exercises every
+major code path.
+
+### Known limitations / pre-launch TODO
+
+- **Evidence storage is ephemeral.** Uploaded evidence files write to
+  the container's local disk (`./evidence_files`). Railway's filesystem
+  doesn't persist across redeploys, so files vanish on every push.
+  Acceptable for early-stage / demo use; before real customer evidence
+  starts flowing, either mount a Railway persistent volume at
+  `/app/evidence_files` or swap `services/evidence_storage.py` for an
+  object-store backend (S3/R2).
+- **Migrations race on multi-replica.** `init_db()` runs
+  `alembic upgrade head` at startup with no advisory lock (audit
+  follow-up A10). Single replica is safe; before scaling out, move the
+  migration to a Railway release-phase command.
+- **`backend/app/seed.py`** is a dev/demo helper and refuses to run
+  with `APP_ENV=production`. It stays in the repo for local dev only.
 
 ## Status
 

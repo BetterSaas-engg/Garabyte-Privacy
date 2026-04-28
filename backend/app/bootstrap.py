@@ -22,6 +22,7 @@ For customer-side admins, use the in-product invitation flow instead.
 from __future__ import annotations
 
 import argparse
+import os
 import secrets
 import sys
 from datetime import datetime
@@ -171,6 +172,27 @@ def main() -> None:
     parser.add_argument("--seed-memberships", action="store_true",
                         help="Also grant org_admin on every demo tenant (dev convenience)")
     args = parser.parse_args()
+
+    # Production hardening: refuse the convenience defaults that are fine in
+    # dev but unsafe in prod (admin@example.com fallback email, generated
+    # password printed to stdout, demo-tenant memberships).
+    is_prod = os.environ.get("APP_ENV", "").strip().lower() == "production"
+    if is_prod:
+        if args.email == DEFAULT_ADMIN_EMAIL:
+            raise SystemExit(
+                "Refusing to bootstrap with the default email under "
+                "APP_ENV=production. Pass --email <real-address>."
+            )
+        if args.password is None:
+            raise SystemExit(
+                "Refusing to auto-generate a password under APP_ENV=production "
+                "(would be printed to aggregated logs). Pass --password 'a long passphrase'."
+            )
+        if args.seed_memberships:
+            raise SystemExit(
+                "Refusing --seed-memberships under APP_ENV=production "
+                "(this flag attaches the bootstrap user to demo tenants)."
+            )
 
     init_db()  # ensure tables exist (idempotent)
 
