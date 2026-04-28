@@ -20,7 +20,12 @@ class Tenant(Base):
     id = Column(Integer, primary_key=True, index=True)
     slug = Column(String(64), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    sector = Column(String(64), nullable=False)  # utility | healthcare | telecom | other
+    # Sector enum (kept in sync with TenantCreate.sector regex):
+    #   utility | healthcare | telecom | saas | financial_services
+    #   | non_profit | retail | government | other
+    # Used by compound-rule sector_constraints to scope sector-aware
+    # findings (audit M-tier calibration item).
+    sector = Column(String(64), nullable=False)
 
     # Display string -- "Ontario & Quebec, Canada", "Canada (national)", etc.
     # Used by the dashboard headers; for jurisdiction-aware filtering of

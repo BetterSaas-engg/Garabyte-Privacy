@@ -134,6 +134,60 @@ class CompoundCondition:
         return True
 
 
+# Known tenant sectors (kept in sync with backend/app/schemas/tenant.py
+# TenantCreate.sector regex and the docstring on Tenant.sector). Compound
+# rules referencing a sector outside this list are rejected at load time.
+KNOWN_SECTORS = {
+    "utility",
+    "healthcare",
+    "telecom",
+    "saas",
+    "financial_services",
+    "non_profit",
+    "retail",
+    "government",
+    "other",
+}
+
+
+@dataclass
+class SizeConstraint:
+    """
+    Optional size-band guard on a compound rule. Matches when the
+    tenant's employee_count falls inside the bounded range. min_employees
+    is inclusive; max_employees is inclusive on the high side (matches
+    "≤500" reading more naturally for non-engineers writing rules).
+    A tenant with employee_count=None is treated as "size unknown" and
+    the rule is skipped — the safer default than silently firing.
+    """
+    min_employees: int | None = None
+    max_employees: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.min_employees is None and self.max_employees is None:
+            raise ValueError(
+                "size_constraints must specify min_employees and/or max_employees"
+            )
+        if (
+            self.min_employees is not None
+            and self.max_employees is not None
+            and self.min_employees > self.max_employees
+        ):
+            raise ValueError(
+                f"size_constraints: min_employees={self.min_employees} > "
+                f"max_employees={self.max_employees}"
+            )
+
+    def matches(self, employee_count: int | None) -> bool:
+        if employee_count is None:
+            return False
+        if self.min_employees is not None and employee_count < self.min_employees:
+            return False
+        if self.max_employees is not None and employee_count > self.max_employees:
+            return False
+        return True
+
+
 @dataclass
 class CompoundRule:
     """
@@ -141,6 +195,13 @@ class CompoundRule:
     matches. Conditions are ANDed; OR semantics are deliberately not
     supported — every credible compound finding in the audit's design
     discussion was naturally an AND.
+
+    sector_constraints + size_constraints (optional, audit M-tier
+    calibration item): a rule with sector_constraints set fires only
+    when the tenant's sector is in the list. Same for size_constraints
+    — fires only when the tenant's employee_count falls in the band.
+    Both empty/None = applies to every tenant (the default, matches
+    the original compound-rule behavior).
     """
     id: str
     severity: str  # critical | high | moderate | low
@@ -150,6 +211,8 @@ class CompoundRule:
     regulatory_risk: str | None = None
     typical_consulting_hours: int | None = None
     upsell_hook: str | None = None
+    sector_constraints: list[str] | None = None
+    size_constraints: SizeConstraint | None = None
 
 
 @dataclass
@@ -233,7 +296,8 @@ class RulesLibrary:
 
         # Compound rules must reference dimensions that exist. A typo
         # (e.g. "d20" for "d2") would silently produce a never-firing
-        # rule otherwise.
+        # rule otherwise. Same logic for sector_constraints: a sector
+        # outside KNOWN_SECTORS would never match any tenant.
         known_dim_ids = {d.id for d in self.dimensions}
         seen_compound_ids: set[str] = set()
         for r in self.compound_rules:
@@ -247,6 +311,13 @@ class RulesLibrary:
                     raise ValueError(
                         f"Compound rule {r.id} references unknown dimension "
                         f"{cond.dimension!r}"
+                    )
+            if r.sector_constraints:
+                bad = [s for s in r.sector_constraints if s not in KNOWN_SECTORS]
+                if bad:
+                    raise ValueError(
+                        f"Compound rule {r.id} references unknown sector(s) "
+                        f"{bad}; expected one of {sorted(KNOWN_SECTORS)}"
                     )
 
 
@@ -347,6 +418,15 @@ def _parse_compound_rule(raw: dict[str, Any]) -> CompoundRule:
         )
         for c in raw.get("conditions", [])
     ]
+    size_raw = raw.get("size_constraints")
+    size_constraints = (
+        SizeConstraint(
+            min_employees=size_raw.get("min_employees"),
+            max_employees=size_raw.get("max_employees"),
+        )
+        if size_raw
+        else None
+    )
     return CompoundRule(
         id=raw["id"],
         severity=raw["severity"],
@@ -356,6 +436,8 @@ def _parse_compound_rule(raw: dict[str, Any]) -> CompoundRule:
         regulatory_risk=raw.get("regulatory_risk"),
         typical_consulting_hours=raw.get("typical_consulting_hours"),
         upsell_hook=raw.get("upsell_hook"),
+        sector_constraints=raw.get("sector_constraints") or None,
+        size_constraints=size_constraints,
     )
 
 

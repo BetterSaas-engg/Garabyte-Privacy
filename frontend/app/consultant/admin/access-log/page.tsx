@@ -179,6 +179,9 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/consultant" className="text-[#9AA1AD] hover:text-[#4B5360]">
               ← Engagements
             </Link>
+            <Link href="/consultant/admin/access-requests" className="text-[#9AA1AD] hover:text-[#4B5360]">
+              Inbound queue →
+            </Link>
             <Link href="/" className="text-[#9AA1AD] hover:text-[#4B5360]">
               Customer site →
             </Link>

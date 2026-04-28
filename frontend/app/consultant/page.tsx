@@ -95,6 +95,9 @@ export default function ConsultantHome() {
             <div className="text-[13px] font-medium text-[#1F242C]">Consultant console</div>
           </div>
           <nav className="ml-auto flex items-center gap-3 text-[12px]">
+            <Link href="/consultant/admin/access-requests" className="text-[#9AA1AD] hover:text-[#4B5360]">
+              Inbound queue →
+            </Link>
             <Link href="/consultant/admin/access-log" className="text-[#9AA1AD] hover:text-[#4B5360]">
               Access log →
             </Link>

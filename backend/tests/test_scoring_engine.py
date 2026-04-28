@@ -145,3 +145,71 @@ def test_compound_findings_use_sentinel_dimension_id(rules):
     findings = _evaluate_compound_rules(rules.compound_rules, by_id, set())
     assert findings, "expected at least one rule to fire"
     assert all(f.dimension_id == COMPOUND_DIMENSION_ID for f in findings)
+
+
+# -- Sector + size constraints (audit M-tier calibration) ----------------
+
+
+def _scores_with_low(dim: str, value: float = 1.5) -> dict[str, float]:
+    by_id = {f"d{i}": 2.5 for i in range(1, 9)}
+    by_id[dim] = value
+    return by_id
+
+
+def test_sector_guard_fires_for_matching_sector(rules):
+    """c7_saas_no_designated_owner fires for saas + 50–500 emp + low d1."""
+    findings = _evaluate_compound_rules(
+        rules.compound_rules, _scores_with_low("d1"),
+        set(), tenant_sector="saas", tenant_employee_count=100,
+    )
+    assert "c7_saas_no_designated_owner" in {f.dimension_name for f in findings}
+
+
+def test_sector_guard_skips_non_matching_sector(rules):
+    """Same scores + employee count, different sector → c7 should not fire."""
+    findings = _evaluate_compound_rules(
+        rules.compound_rules, _scores_with_low("d1"),
+        set(), tenant_sector="utility", tenant_employee_count=100,
+    )
+    assert "c7_saas_no_designated_owner" not in {f.dimension_name for f in findings}
+
+
+def test_size_guard_fires_within_band(rules):
+    """c9_enterprise_vendor_sprawl needs ≥5000 employees AND low d5."""
+    findings = _evaluate_compound_rules(
+        rules.compound_rules, _scores_with_low("d5"),
+        set(), tenant_sector="other", tenant_employee_count=10_000,
+    )
+    assert "c9_enterprise_vendor_sprawl" in {f.dimension_name for f in findings}
+
+
+def test_size_guard_skips_below_band(rules):
+    """100-emp tenant with low d5 → c9 should not fire."""
+    findings = _evaluate_compound_rules(
+        rules.compound_rules, _scores_with_low("d5"),
+        set(), tenant_sector="other", tenant_employee_count=100,
+    )
+    assert "c9_enterprise_vendor_sprawl" not in {f.dimension_name for f in findings}
+
+
+def test_size_guard_skips_when_employee_count_unknown(rules):
+    """A tenant with no employee_count must NOT fire size-guarded rules."""
+    findings = _evaluate_compound_rules(
+        rules.compound_rules, _scores_with_low("d5"),
+        set(), tenant_sector="other", tenant_employee_count=None,
+    )
+    assert "c9_enterprise_vendor_sprawl" not in {f.dimension_name for f in findings}
+
+
+def test_unbounded_size_constraint_rejected_at_load():
+    from app.services.rules_loader import SizeConstraint
+
+    with pytest.raises(ValueError, match="must specify"):
+        SizeConstraint()
+
+
+def test_inverted_size_constraint_rejected():
+    from app.services.rules_loader import SizeConstraint
+
+    with pytest.raises(ValueError, match=">"):
+        SizeConstraint(min_employees=5000, max_employees=100)

@@ -6,11 +6,19 @@ import Link from "next/link";
 import { createTenant, isUnauthorized, whoami } from "@/lib/api";
 import { JURISDICTION_CODES } from "@/lib/types";
 
+// Sector list — kept in sync with backend/app/schemas/tenant.py
+// TenantCreate.sector regex and rules_loader KNOWN_SECTORS. Order
+// matters for the dropdown UI (most-common first, "Other" last).
 const SECTORS = [
-  { value: "utility",     label: "Utility" },
-  { value: "healthcare",  label: "Healthcare" },
-  { value: "telecom",     label: "Telecom" },
-  { value: "other",       label: "Other" },
+  { value: "saas",                label: "SaaS / software" },
+  { value: "healthcare",          label: "Healthcare" },
+  { value: "financial_services",  label: "Financial services" },
+  { value: "utility",             label: "Utility" },
+  { value: "telecom",             label: "Telecom" },
+  { value: "retail",              label: "Retail" },
+  { value: "non_profit",          label: "Non-profit" },
+  { value: "government",          label: "Government" },
+  { value: "other",               label: "Other" },
 ] as const;
 
 type Sector = typeof SECTORS[number]["value"];

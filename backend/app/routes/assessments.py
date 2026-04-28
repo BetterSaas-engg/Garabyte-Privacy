@@ -610,7 +610,16 @@ def finalize_assessment(
         for r in assessment.responses
         if r.value is not None and not r.skipped
     }
-    result = score_assessment(RULES, responses, evidence_provided)
+
+    # Tenant context for sector/size-aware compound rules. Loaded fresh
+    # so a tenant edit between assessment-create and assessment-score
+    # picks up the latest sector + employee_count.
+    tenant_row = db.query(Tenant).filter(Tenant.id == assessment.tenant_id).first()
+    result = score_assessment(
+        RULES, responses, evidence_provided,
+        tenant_sector=tenant_row.sector if tenant_row else None,
+        tenant_employee_count=tenant_row.employee_count if tenant_row else None,
+    )
     result_dict = result.to_dict()
 
     assessment.overall_score = result.overall_score

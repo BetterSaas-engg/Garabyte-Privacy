@@ -10,7 +10,10 @@ class TenantCreate(BaseModel):
     """Payload for POST /tenants."""
     slug: str = Field(..., min_length=2, max_length=64, pattern=r"^[a-z0-9-]+$")
     name: str = Field(..., min_length=1, max_length=255)
-    sector: str = Field(..., pattern=r"^(utility|healthcare|telecom|other)$")
+    sector: str = Field(
+        ...,
+        pattern=r"^(utility|healthcare|telecom|saas|financial_services|non_profit|retail|government|other)$",
+    )
     jurisdiction: str = "Canada"
     # ISO-style jurisdiction codes for regulatory citation filtering
     # (audit M22). e.g. ["CA", "CA-QC"] for a Quebec-based Canadian

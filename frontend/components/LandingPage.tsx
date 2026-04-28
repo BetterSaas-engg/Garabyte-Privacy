@@ -90,12 +90,12 @@ export function LandingPage() {
             </div>
             <p className="text-xs text-garabyte-ink-500">
               Already invited? Sign in. New here? Talk to your privacy lead, or{" "}
-              <a
-                href="mailto:hello@garabyte.com"
+              <Link
+                href="/request-access"
                 className="text-garabyte-primary-500 hover:text-garabyte-primary-700"
               >
-                contact Garabyte
-              </a>
+                request access
+              </Link>
               .
             </p>
           </div>
@@ -285,12 +285,12 @@ export function LandingPage() {
             >
               Sign in
             </Link>
-            <a
-              href="mailto:hello@garabyte.com"
+            <Link
+              href="/request-access"
               className="inline-flex items-center px-5 py-2.5 rounded-md border border-garabyte-ink-100 text-garabyte-primary-700 text-sm font-medium hover:bg-garabyte-cream-100 transition-colors"
             >
-              Talk to Garabyte
-            </a>
+              Request access
+            </Link>
           </div>
         </div>
       </section>

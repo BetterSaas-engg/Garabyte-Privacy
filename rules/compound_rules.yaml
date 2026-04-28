@@ -142,3 +142,78 @@ compound_rules:
       documentation to operational evidence. A program that scores well on
       d1 but poorly elsewhere is a known red flag pattern in audits.
     typical_consulting_hours: 40
+
+  # ---------------------------------------------------------------------
+  # Sector- and size-aware compound rules (audit M-tier calibration).
+  # These fire only for tenants matching the named sector or size band.
+  # Default content authored as starter material — Garabyte's privacy
+  # practice should refine the recommendation language and add more
+  # patterns as real engagements surface them.
+  # ---------------------------------------------------------------------
+
+  - id: c7_saas_no_designated_owner
+    severity: high
+    finding: SaaS has outgrown ad-hoc privacy ownership
+    conditions:
+      - dimension: d1
+        score_max: 2.0
+    sector_constraints: [saas]
+    size_constraints:
+      min_employees: 50
+      max_employees: 500
+    recommendation: >
+      Mid-stage SaaS (50–500 employees) is the inflection point at which
+      ad-hoc privacy ownership stops scaling — enterprise-customer DPAs,
+      SOC 2 audits, and the first regulator inquiry all arrive in this
+      band. Name a privacy lead with a documented scope before any of
+      those force the decision. A formal committee can wait until the
+      org crosses 250.
+    regulatory_risk: >
+      PIPEDA Principle 1 (accountability) requires a named privacy
+      officer for any organization handling personal data. SOC 2 CC1.4
+      and ISO 27701 likewise require a designated owner.
+    typical_consulting_hours: 12
+
+  - id: c8_healthcare_consent_thin
+    severity: critical
+    finding: Healthcare-grade consent practices missing
+    conditions:
+      - dimension: d3
+        score_max: 2.5
+    sector_constraints: [healthcare]
+    recommendation: >
+      Healthcare carries higher consent expectations than general
+      industry — Ontario PHIPA s. 18, Quebec Law 25 health-specific
+      provisions, and HIPAA equivalents all require granular per-purpose
+      consent with clear withdrawal pathways. A score below "Managed"
+      on d3 is a regulatory exposure for any healthcare provider; treat
+      as a top-three priority regardless of overall score.
+    regulatory_risk: >
+      PHIPA s. 18 + Quebec Law 25 s. 14 (health-specific) + HIPAA
+      §164.508. The CAI and OPC have both taken enforcement action
+      against healthcare orgs for thin consent practices in the last
+      24 months.
+    typical_consulting_hours: 50
+
+  - id: c9_enterprise_vendor_sprawl
+    severity: high
+    finding: Enterprise-scale vendor footprint without management
+    conditions:
+      - dimension: d5
+        score_max: 2.0
+    size_constraints:
+      min_employees: 5000
+    recommendation: >
+      Organizations at 5,000+ employees typically have 100+ vendors
+      touching personal data, and ad-hoc vendor management cannot keep
+      up. Stand up (or contract for) third-party risk management
+      tooling that automates DPA tracking, sub-processor disclosure,
+      and quarterly attestation. Manual approaches don't scale past
+      this point and the gap compounds with every new vendor.
+    regulatory_risk: >
+      PIPEDA Principle 1 holds the organization accountable for personal
+      data transferred to third parties. GDPR Article 28 requires
+      processor agreements with specific clauses for every processor.
+      Enforcement actions at this scale routinely cite vendor-management
+      gaps as the proximate cause.
+    typical_consulting_hours: 60

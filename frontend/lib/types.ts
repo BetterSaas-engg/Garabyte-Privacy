@@ -9,7 +9,16 @@ export interface Tenant {
   id: number;
   slug: string;
   name: string;
-  sector: "utility" | "healthcare" | "telecom" | "other";
+  sector:
+    | "utility"
+    | "healthcare"
+    | "telecom"
+    | "saas"
+    | "financial_services"
+    | "non_profit"
+    | "retail"
+    | "government"
+    | "other";
   jurisdiction: string;
   jurisdiction_codes: string[] | null;
   employee_count: number | null;
@@ -20,7 +29,16 @@ export interface Tenant {
 export interface TenantCreate {
   slug: string;
   name: string;
-  sector: "utility" | "healthcare" | "telecom" | "other";
+  sector:
+    | "utility"
+    | "healthcare"
+    | "telecom"
+    | "saas"
+    | "financial_services"
+    | "non_profit"
+    | "retail"
+    | "government"
+    | "other";
   jurisdiction?: string;
   jurisdiction_codes?: string[];
   employee_count?: number;

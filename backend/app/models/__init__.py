@@ -3,6 +3,14 @@ from .base import Base
 from .tenant import Tenant
 from .assessment import Assessment
 from .response import Response
+from .access_request import (
+    AccessRequest,
+    ALL_ACCESS_REQUEST_STATUSES,
+    ACCESS_REQUEST_PENDING,
+    ACCESS_REQUEST_CONTACTED,
+    ACCESS_REQUEST_ONBOARDED,
+    ACCESS_REQUEST_DECLINED,
+)
 from .evidence import EvidenceFile
 from .finding import (
     AssessmentPublication,
@@ -71,4 +79,10 @@ __all__ = [
     "TOKEN_MAGIC_LINK",
     "TOKEN_PASSWORD_RESET",
     "TOKEN_INVITATION",
+    "AccessRequest",
+    "ALL_ACCESS_REQUEST_STATUSES",
+    "ACCESS_REQUEST_PENDING",
+    "ACCESS_REQUEST_CONTACTED",
+    "ACCESS_REQUEST_ONBOARDED",
+    "ACCESS_REQUEST_DECLINED",
 ]

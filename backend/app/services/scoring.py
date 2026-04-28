@@ -237,6 +237,9 @@ def _evaluate_compound_rules(
     compound_rules: list[CompoundRule],
     dim_scores_by_id: dict[str, float],
     skipped_dim_ids: set[str],
+    *,
+    tenant_sector: str | None = None,
+    tenant_employee_count: int | None = None,
 ) -> list[GapFinding]:
     """
     Fire each compound rule whose conditions ALL match. Sort score is
@@ -245,9 +248,23 @@ def _evaluate_compound_rules(
     score ordering). Skipped/no-data dimensions are excluded — firing
     a compound rule off a dimension we couldn't score is the same
     silent-mistake pattern as audit C4.
+
+    Sector + size guards (audit M-tier calibration):
+      - rule.sector_constraints set + tenant_sector not in list → skip
+      - rule.size_constraints set + tenant employee_count out of range
+        → skip (employee_count=None counts as "out of range" by
+        SizeConstraint.matches — safer default than firing blindly)
+      - Either constraint absent on the rule → applies to every tenant
+        (the original compound-rule semantic).
     """
     findings: list[GapFinding] = []
     for rule in compound_rules:
+        # Sector guard
+        if rule.sector_constraints and tenant_sector not in rule.sector_constraints:
+            continue
+        # Size guard
+        if rule.size_constraints and not rule.size_constraints.matches(tenant_employee_count):
+            continue
         if any(c.dimension in skipped_dim_ids for c in rule.conditions):
             continue
         if not all(
@@ -281,6 +298,9 @@ def score_assessment(
     rules: RulesLibrary,
     responses: dict[str, int],
     evidence_provided: dict[str, bool] | None = None,
+    *,
+    tenant_sector: str | None = None,
+    tenant_employee_count: int | None = None,
 ) -> AssessmentResult:
     """
     Main entry point. Given the rules library and a set of responses,
@@ -291,6 +311,11 @@ def score_assessment(
     an evidence_coverage stat (% of answered questions with evidence). When
     omitted, evidence_coverage is reported as 0.0 across the board (the
     typical case for synthetic seed data and tests).
+
+    tenant_sector + tenant_employee_count enable sector/size-aware
+    compound rules to fire (audit M-tier calibration). Both default to
+    None — the engine still produces unconditional compound findings,
+    just no sector-conditional ones.
 
     Raises ValueError if any response uses an unknown question ID
     or a value outside [0, 4].
@@ -328,7 +353,13 @@ def score_assessment(
         ds.dimension_id for ds in dim_scores if ds.confidence == "none"
     }
     all_gaps.extend(
-        _evaluate_compound_rules(rules.compound_rules, dim_score_map, skipped_dim_ids)
+        _evaluate_compound_rules(
+            rules.compound_rules,
+            dim_score_map,
+            skipped_dim_ids,
+            tenant_sector=tenant_sector,
+            tenant_employee_count=tenant_employee_count,
+        )
     )
 
     # Overall score is the weighted mean of dimensions with usable data.

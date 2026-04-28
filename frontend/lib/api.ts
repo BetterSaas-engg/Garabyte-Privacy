@@ -458,6 +458,64 @@ export function unpublishAssessment(assessmentId: number): Promise<{ id: number 
   });
 }
 
+// ---- Access requests (inbound landing-page funnel) ----
+
+export interface AccessRequestSubmit {
+  name: string;
+  email: string;
+  org_name: string;
+  sector?: string;
+  employee_count?: number;
+  message?: string;
+}
+
+export function submitAccessRequest(payload: AccessRequestSubmit): Promise<{ received: boolean }> {
+  return apiRequest<{ received: boolean }>("/access-requests", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface AccessRequestRow {
+  id: number;
+  name: string;
+  email: string;
+  org_name: string;
+  sector: string | null;
+  employee_count: number | null;
+  message: string | null;
+  source_ip: string | null;
+  status: string;
+  triage_notes: string | null;
+  triaged_by_id: number | null;
+  triaged_by_email: string | null;
+  triaged_at: string | null;
+  created_at: string;
+}
+
+export function listAccessRequests(params: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<AccessRequestRow[]> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  const q = qs.toString();
+  return apiRequest<AccessRequestRow[]>(`/admin/access-requests${q ? `?${q}` : ""}`);
+}
+
+export function updateAccessRequest(
+  id: number,
+  payload: { status?: string; triage_notes?: string },
+): Promise<AccessRequestRow> {
+  return apiRequest<AccessRequestRow>(`/admin/access-requests/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 // ---- Admin / audit log (Phase 6C) ----
 
 export interface AccessLogRow {

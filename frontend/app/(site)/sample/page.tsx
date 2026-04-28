@@ -299,12 +299,12 @@ export default function SamplePage() {
             >
               Sign in
             </Link>
-            <a
-              href="mailto:hello@garabyte.com"
+            <Link
+              href="/request-access"
               className="inline-flex items-center px-4 py-2 rounded-md border border-garabyte-ink-100 text-garabyte-primary-700 text-sm font-medium hover:bg-garabyte-cream-100 transition-colors"
             >
-              Talk to Garabyte
-            </a>
+              Request access
+            </Link>
           </div>
         </section>
 
