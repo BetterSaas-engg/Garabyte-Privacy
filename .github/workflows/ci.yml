@@ -32,28 +32,17 @@ jobs:
           alembic upgrade head
           alembic check  # fails if model metadata diverges from migrations
 
-      # The smoke tests are bare scripts (not pytest); some print [FAIL]
-      # but exit 0. The grep guard catches that until they are converted
-      # to proper pytest tests (M12 in the audit). GitHub Actions' default
-      # shell is `bash -eo pipefail`, so the pipe preserves python's exit
-      # code and any non-zero stops the step.
-      - name: Smoke tests — rules loader
-        run: |
-          python test_rules_loader.py 2>&1 | tee out.log
-          ! grep -q '\[FAIL\]' out.log
+      - name: Pytest suite
+        run: pytest -ra
 
-      - name: Smoke tests — scoring engine
+      # Legacy script-style smoke tests. Kept around because they exercise
+      # full flows in a different shape than the pytest suite (and the
+      # scoring-profile baselines are useful as a sanity check). The grep
+      # guard catches the [FAIL] lines they emit in print form.
+      - name: Legacy smoke — end-to-end
         run: |
-          python test_scoring.py 2>&1 | tee out.log
+          python test_end_to_end.py 2>&1 | tee out.log
           ! grep -q '\[FAIL\]' out.log
-
-      - name: Smoke tests — database
-        run: |
-          python test_database.py 2>&1 | tee out.log
-          ! grep -q '\[FAIL\]' out.log
-
-      - name: Smoke tests — end-to-end
-        run: python test_end_to_end.py
 
   frontend:
     name: Frontend lint + typecheck + build
