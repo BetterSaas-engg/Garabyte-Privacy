@@ -53,6 +53,14 @@ export function SiteHeader() {
     pathname === "/contact";
   const showMarketingNav = isMarketingPath && checked && !me;
 
+  // Garabyte staff (consultants + admins) get a "Console" link in the
+  // header so they don't have to type /consultant manually. Other authed
+  // users (org_admin / section_contributor / org_viewer) don't see it.
+  const hasConsoleAccess =
+    me?.memberships.some(
+      (m) => m.role === "garabyte_admin" || m.role === "consultant",
+    ) ?? false;
+
   return (
     <header className="border-b border-garabyte-ink-100 bg-garabyte-cream-50/80 backdrop-blur-sm sticky top-0 z-10">
       <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
@@ -93,6 +101,17 @@ export function SiteHeader() {
           {checked && (
             me ? (
               <div className="flex items-center gap-3">
+                {/* Console link — only renders when the user has a role
+                    that gets cross-tenant access. Hidden when already on
+                    a /consultant page so it doesn't link back to itself. */}
+                {hasConsoleAccess && !pathname.startsWith("/consultant") && (
+                  <Link
+                    href="/consultant"
+                    className="text-garabyte-primary-500 hover:text-garabyte-primary-700 transition-colors"
+                  >
+                    Console
+                  </Link>
+                )}
                 <span className="text-garabyte-ink-700 hidden sm:inline">
                   {me.user.name || me.user.email}
                 </span>
