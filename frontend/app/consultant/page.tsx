@@ -101,9 +101,6 @@ export default function ConsultantHome() {
             <Link href="/consultant/admin/access-log" className="text-[#9AA1AD] hover:text-[#4B5360]">
               Access log →
             </Link>
-            <Link href="/consultant/design" className="text-[#9AA1AD] hover:text-[#4B5360]">
-              Design canvas →
-            </Link>
             <Link href="/" className="text-[#9AA1AD] hover:text-[#4B5360]">
               Customer site →
             </Link>
