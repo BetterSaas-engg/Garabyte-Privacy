@@ -45,3 +45,9 @@ class TenantHistoryItem(BaseModel):
     # awaiting consultant review" from "published". Frontend renders
     # the published row as authoritative and grays the unpublished one.
     published_at: Optional[datetime] = None
+    # Rules-library version this assessment was scored under. Lets the
+    # trend chart draw a discontinuity marker when adjacent assessments
+    # were scored under different libraries — so a customer reading the
+    # trend doesn't mistake a rules-update wobble for a program change.
+    # (Audit H11 customer-visible half.)
+    rules_version: Optional[str] = None

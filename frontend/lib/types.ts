@@ -49,6 +49,7 @@ export interface TenantHistoryItem {
   overall_maturity: string | null;
   completed_at: string | null;
   published_at: string | null;
+  rules_version: string | null;
 }
 
 // Phase 5 — finding + annotation types

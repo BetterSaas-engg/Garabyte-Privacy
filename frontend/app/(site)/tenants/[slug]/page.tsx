@@ -26,6 +26,7 @@ import { ScoreSummary } from "@/components/ScoreSummary";
 import { DimensionGrid } from "@/components/DimensionGrid";
 import { GapFindingCard } from "@/components/GapFinding";
 import { AssessmentHistory } from "@/components/AssessmentHistory";
+import { TrendChart } from "@/components/TrendChart";
 
 // Map a (post-annotation) FindingFromApi onto the existing GapFinding
 // shape so we can keep using GapFindingCard. Dismissed findings should
@@ -425,7 +426,10 @@ export default function TenantDashboard({
 
             <section>
               <h2 className="text-h2 text-garabyte-primary-800 mb-5">Assessment history</h2>
-              <AssessmentHistory history={history} />
+              <div className="space-y-4">
+                <TrendChart history={history} />
+                <AssessmentHistory history={history} />
+              </div>
             </section>
           </>
         )}

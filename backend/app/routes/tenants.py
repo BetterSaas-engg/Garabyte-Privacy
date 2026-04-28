@@ -297,6 +297,7 @@ def get_tenant_history(
             overall_maturity=a.overall_maturity,
             completed_at=a.completed_at,
             published_at=a.published_at,
+            rules_version=(a.result_json or {}).get("rules_version") if a.result_json else None,
         )
         for a in completed
     ]
