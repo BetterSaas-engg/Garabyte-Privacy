@@ -72,14 +72,23 @@ def _normalize_email(email: str) -> str:
 
 
 def _set_session_cookie(response: Response, session_id: str) -> None:
-    secure = settings.app_env != "development"
+    # In dev, frontend and backend share localhost so the request is
+    # same-site — lax keeps the baseline CSRF protection.
+    # In prod the frontend (Vercel) and backend (Railway) live on
+    # different registrable domains, so any auth fetch is cross-site.
+    # Browsers refuse to send SameSite=Lax cookies on cross-site
+    # requests, which silently breaks login. SameSite=None lets the
+    # browser send it; SameSite=None requires Secure. CSRF is still
+    # mitigated by the X-Requested-With check in main.py plus the
+    # CORS preflight gated on allow_origins (not "*").
+    is_dev = settings.app_env == "development"
     response.set_cookie(
         key=SESSION_COOKIE,
         value=session_id,
         max_age=SESSION_ABSOLUTE_DAYS * 24 * 60 * 60,
         httponly=True,
-        secure=secure,
-        samesite="lax",
+        secure=not is_dev,
+        samesite="lax" if is_dev else "none",
         path="/",
     )
 
