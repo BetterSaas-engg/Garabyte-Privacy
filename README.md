@@ -94,9 +94,12 @@ fixtures off the public internet.
 3. Add a **Postgres** add-on. Railway exposes its connection string as
    the `DATABASE_URL` env var on the backend service automatically.
 4. Set the env vars in the table below.
-5. Deploy. The container's `CMD` starts uvicorn; on first boot
-   `init_db()` runs `alembic upgrade head` automatically, so the schema
-   comes up empty-but-migrated.
+5. Deploy. Railway runs the `preDeployCommand` from
+   [railway.toml](railway.toml) — a separate, short-lived container
+   that executes `alembic upgrade head` and exits. Only after that
+   completes does the web container start serving uvicorn. This keeps
+   the web container's startup instant and prevents the healthcheck
+   from racing the migration runtime.
 6. Open a shell on the backend service and bootstrap the first admin:
    ```bash
    APP_ENV=production python -m app.bootstrap \
@@ -172,10 +175,12 @@ major code path.
   starts flowing, either mount a Railway persistent volume at
   `/app/evidence_files` or swap `services/evidence_storage.py` for an
   object-store backend (S3/R2).
-- **Migrations race on multi-replica.** `init_db()` runs
-  `alembic upgrade head` at startup with no advisory lock (audit
-  follow-up A10). Single replica is safe; before scaling out, move the
-  migration to a Railway release-phase command.
+- **Migrations.** Run via Railway's `preDeployCommand` (see
+  [railway.toml](railway.toml)) in a separate container before the web
+  container boots. Multi-replica safe (only one preDeploy runs per
+  deploy) and decoupled from the healthcheck timeout. Locally,
+  `init_db()` still auto-applies migrations on uvicorn startup so dev
+  doesn't have to remember `alembic upgrade head` after every pull.
 - **`backend/app/seed.py`** is a dev/demo helper and refuses to run
   with `APP_ENV=production`. It stays in the repo for local dev only.
 

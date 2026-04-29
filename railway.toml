@@ -8,7 +8,16 @@ builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
+# Run migrations in a separate, short-lived container BEFORE the web
+# container boots. Two reasons:
+#   1. Startup speed — uvicorn responds to /health immediately, so the
+#      30s healthcheck window doesn't race the migration runtime.
+#   2. Multi-replica safety (audit A10) — only one preDeploy container
+#      runs per deploy, so concurrent web replicas can't race on the
+#      same upgrade.
+preDeployCommand = "alembic upgrade head"
+
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
