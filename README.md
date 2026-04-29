@@ -96,11 +96,14 @@ fixtures off the public internet.
 4. Set the env vars in the table below.
 5. Deploy. Railway runs the `preDeployCommand` from
    [railway.toml](railway.toml) — a separate, short-lived container
-   that runs `alembic upgrade head` and then idempotently creates the
-   first admin user from the bootstrap env vars (see step 6 below).
-   Only after that completes does the web container start serving
-   uvicorn. This keeps web startup instant and prevents the healthcheck
-   from racing the migration runtime.
+   that runs [backend/app/migrate.py](backend/app/migrate.py) (smart
+   migration: fresh DB → `alembic upgrade head`; orphaned schema with
+   tables but no `alembic_version` → stamp head and adopt; managed
+   DB → normal upgrade) and then idempotently creates the first admin
+   user from the bootstrap env vars (see step 6 below). Only after
+   that completes does the web container start serving uvicorn. This
+   keeps web startup instant and prevents the healthcheck from racing
+   the migration runtime.
 6. Bootstrap the first admin via env vars (no shell needed). In Railway →
    backend service → Variables, add:
 

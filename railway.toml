@@ -19,7 +19,7 @@ dockerfilePath = "backend/Dockerfile"
 # from the BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD service
 # variables (the bootstrap step no-ops cleanly if those vars aren't
 # set yet, so first deploys without them still succeed).
-preDeployCommand = "sh -c 'alembic upgrade head && python -m app.bootstrap --if-env'"
+preDeployCommand = "sh -c 'python -m app.migrate && python -m app.bootstrap --if-env'"
 
 healthcheckPath = "/health"
 healthcheckTimeout = 60
