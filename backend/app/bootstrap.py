@@ -111,12 +111,24 @@ def _ensure_garabyte_admin_membership(db, user: User) -> None:
 
     any_tenant = db.query(Tenant).order_by(Tenant.id.asc()).first()
     if not any_tenant:
-        print(
-            "[!]  No tenants exist yet, so the garabyte_admin role can't be "
-            "anchored to a row in this schema. Re-run after seeding tenants, "
-            "or create one via the API once a tenant exists."
+        # First-deploy chicken-and-egg: the garabyte_admin role can't be
+        # anchored without a tenant, but the API path for creating
+        # tenants requires garabyte_admin. Break the cycle by spinning
+        # up a sentinel internal tenant — the admin can rename/repurpose
+        # or ignore it once real customer tenants start coming in.
+        any_tenant = Tenant(
+            slug="_garabyte_internal",
+            name="Garabyte (internal)",
+            sector="other",
+            jurisdiction="N/A",
+            is_demo=0,
         )
-        return
+        db.add(any_tenant)
+        db.flush()
+        print(
+            f"[OK] Created sentinel tenant '_garabyte_internal' to anchor "
+            f"the garabyte_admin role (id={any_tenant.id})."
+        )
 
     db.add(OrgMembership(
         user_id=user.id,
@@ -163,30 +175,59 @@ def _seed_org_admin_memberships(db, user: User) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bootstrap a Garabyte admin user.")
-    parser.add_argument("--email", default=DEFAULT_ADMIN_EMAIL,
-                        help=f"Email for the bootstrap admin (default: {DEFAULT_ADMIN_EMAIL})")
+    parser.add_argument("--email", default=None,
+                        help=f"Email for the bootstrap admin. "
+                             f"Falls back to $BOOTSTRAP_ADMIN_EMAIL, then "
+                             f"{DEFAULT_ADMIN_EMAIL} in dev only.")
     parser.add_argument("--password", default=None,
-                        help="Password. If omitted, a random one is generated and printed.")
+                        help="Password. Falls back to $BOOTSTRAP_ADMIN_PASSWORD. "
+                             "In dev only, a random one is generated and printed.")
     parser.add_argument("--name", default="Garabyte admin",
                         help="Display name for the bootstrap admin")
     parser.add_argument("--seed-memberships", action="store_true",
                         help="Also grant org_admin on every demo tenant (dev convenience)")
+    parser.add_argument("--if-env", action="store_true",
+                        help="Only run if BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD "
+                             "are set; otherwise no-op exit 0. Use this in Railway's "
+                             "preDeployCommand so deploys don't fail when the operator "
+                             "hasn't provisioned bootstrap creds yet.")
     args = parser.parse_args()
+
+    # Pull from env vars when CLI flags weren't passed. Railway operators
+    # set these in the service Variables tab and never touch the shell.
+    email = args.email or os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "").strip() or None
+    password = args.password or os.environ.get("BOOTSTRAP_ADMIN_PASSWORD") or None
+
+    # --if-env mode: silently skip when env vars aren't provisioned. This
+    # lets the preDeployCommand chain `alembic upgrade head && bootstrap`
+    # without failing the deploy on services that haven't set the vars.
+    if args.if_env and not (email and password):
+        print(
+            "[skip] --if-env set but BOOTSTRAP_ADMIN_EMAIL or "
+            "BOOTSTRAP_ADMIN_PASSWORD missing. Set both in the service "
+            "Variables tab to auto-create the admin on next deploy."
+        )
+        return
+
+    # Apply dev defaults only when not in production.
+    is_prod = os.environ.get("APP_ENV", "").strip().lower() == "production"
+    if not email:
+        email = DEFAULT_ADMIN_EMAIL
 
     # Production hardening: refuse the convenience defaults that are fine in
     # dev but unsafe in prod (admin@example.com fallback email, generated
     # password printed to stdout, demo-tenant memberships).
-    is_prod = os.environ.get("APP_ENV", "").strip().lower() == "production"
     if is_prod:
-        if args.email == DEFAULT_ADMIN_EMAIL:
+        if email == DEFAULT_ADMIN_EMAIL:
             raise SystemExit(
                 "Refusing to bootstrap with the default email under "
-                "APP_ENV=production. Pass --email <real-address>."
+                "APP_ENV=production. Set BOOTSTRAP_ADMIN_EMAIL or pass --email."
             )
-        if args.password is None:
+        if not password:
             raise SystemExit(
                 "Refusing to auto-generate a password under APP_ENV=production "
-                "(would be printed to aggregated logs). Pass --password 'a long passphrase'."
+                "(would be printed to aggregated logs). "
+                "Set BOOTSTRAP_ADMIN_PASSWORD or pass --password."
             )
         if args.seed_memberships:
             raise SystemExit(
@@ -196,11 +237,12 @@ def main() -> None:
 
     init_db()  # ensure tables exist (idempotent)
 
-    password = args.password or secrets.token_urlsafe(18)
+    password_was_generated = password is None
+    password = password or secrets.token_urlsafe(18)
 
     db = SessionLocal()
     try:
-        user = _ensure_user(db, email=args.email, password=password, name=args.name)
+        user = _ensure_user(db, email=email, password=password, name=args.name)
         _ensure_garabyte_admin_membership(db, user)
         if args.seed_memberships:
             _seed_org_admin_memberships(db, user)
@@ -208,15 +250,15 @@ def main() -> None:
     finally:
         db.close()
 
-    if args.password is None:
+    if password_was_generated:
         print(
             f"\n[OK] Bootstrap complete.\n"
-            f"     email:    {args.email}\n"
+            f"     email:    {email}\n"
             f"     password: {password}\n"
             f"     (Save this -- it isn't recoverable.)"
         )
     else:
-        print(f"\n[OK] Bootstrap complete for {args.email}")
+        print(f"\n[OK] Bootstrap complete for {email}")
 
 
 if __name__ == "__main__":

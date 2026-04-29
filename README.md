@@ -96,19 +96,28 @@ fixtures off the public internet.
 4. Set the env vars in the table below.
 5. Deploy. Railway runs the `preDeployCommand` from
    [railway.toml](railway.toml) — a separate, short-lived container
-   that executes `alembic upgrade head` and exits. Only after that
-   completes does the web container start serving uvicorn. This keeps
-   the web container's startup instant and prevents the healthcheck
+   that runs `alembic upgrade head` and then idempotently creates the
+   first admin user from the bootstrap env vars (see step 6 below).
+   Only after that completes does the web container start serving
+   uvicorn. This keeps web startup instant and prevents the healthcheck
    from racing the migration runtime.
-6. Open a shell on the backend service and bootstrap the first admin:
-   ```bash
-   APP_ENV=production python -m app.bootstrap \
-     --email "you@garabyte.com" \
-     --password 'a long passphrase'
-   ```
-   `--email` and `--password` are required under `APP_ENV=production`
-   (the bootstrap CLI refuses the dev defaults). Change the password
-   after first sign-in via the in-product reset flow.
+6. Bootstrap the first admin via env vars (no shell needed). In Railway →
+   backend service → Variables, add:
+
+   | Variable | Value |
+   |---|---|
+   | `BOOTSTRAP_ADMIN_EMAIL` | the email you'll log in with |
+   | `BOOTSTRAP_ADMIN_PASSWORD` | a long passphrase (16+ chars) |
+
+   Redeploy. The preDeploy step picks them up and creates the
+   `garabyte_admin` user. The script is idempotent — if the user
+   already exists it leaves the password alone. Once you've logged
+   in successfully, **delete both variables from Railway** so the
+   plaintext password isn't sitting in your environment forever.
+   Change the password from inside the app via password reset.
+
+   (If you'd rather bootstrap from a shell instead of env vars,
+   `python -m app.bootstrap --email ... --password ...` still works.)
 
 #### Required Railway env vars
 
