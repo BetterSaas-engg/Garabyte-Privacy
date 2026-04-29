@@ -193,6 +193,23 @@ major code path.
   deploy) and decoupled from the healthcheck timeout. Locally,
   `init_db()` still auto-applies migrations on uvicorn startup so dev
   doesn't have to remember `alembic upgrade head` after every pull.
+
+- **Recovering a partial / orphaned schema.** If a previous deploy
+  left the DB with application tables but no `alembic_version` row,
+  [backend/app/migrate.py](backend/app/migrate.py) detects this and
+  refuses to silently lie about the schema state. Two recovery paths,
+  both runnable from the Railway dashboard without shell access:
+
+  - **If the existing tables match a known revision** (e.g. only the
+    baseline tables `tenants`/`assessments`/`responses`): set
+    `MIGRATE_STAMP_REVISION` on the backend service to that revision
+    (e.g. `b54d2f396450`) and redeploy. The script stamps that
+    revision and then `alembic upgrade head` applies every subsequent
+    migration. Remove the variable after the deploy succeeds.
+  - **If the existing tables hold no real data**: drop them in the
+    Postgres console (Railway dashboard → Postgres add-on → Data tab,
+    or `psql`) and redeploy. `migrate.py` will see a fresh DB and run
+    `alembic upgrade head` from scratch.
 - **`backend/app/seed.py`** is a dev/demo helper and refuses to run
   with `APP_ENV=production`. It stays in the repo for local dev only.
 

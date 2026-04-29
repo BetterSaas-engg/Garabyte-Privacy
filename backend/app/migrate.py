@@ -1,7 +1,7 @@
 """
 Smart entry point for Railway's preDeployCommand.
 
-Three possible database states; this script picks the right action for each:
+Four possible database states; this script picks the right action for each:
 
 1. Fresh DB (no tables at all)
    -> alembic upgrade head. Creates everything from scratch.
@@ -9,21 +9,26 @@ Three possible database states; this script picks the right action for each:
 2. Managed DB (alembic_version present, with a row)
    -> alembic upgrade head. Applies any new migrations; no-op if at head.
 
-3. Orphaned schema (app tables exist, alembic_version missing or empty)
+3. Orphaned schema, complete (app tables exist + match every model
+   table, alembic_version missing/empty)
    -> alembic stamp head, then no upgrade.
-   This recovers from prior deploys that populated the schema via
-   Base.metadata.create_all() or a partial migration without
-   committing the alembic_version row. The stamp brings the existing
-   schema under alembic management without touching its data.
+   Recovers from prior deploys that populated the full schema via
+   Base.metadata.create_all() without ever creating alembic_version.
 
-   Safety net: we only stamp when EVERY expected model table is
-   already present. If any are missing, the schema is partial and we
-   fail loudly rather than silently lying about its state -- the
-   operator needs to decide how to reconcile.
+4. Orphaned schema, partial (app tables exist but some are missing —
+   typically because a baseline migration committed before later
+   migrations were applied)
+   -> requires explicit operator opt-in via MIGRATE_STAMP_REVISION
+   so we don't silently lie about which revision the schema is at.
+   Set the env var to the revision the existing tables correspond to;
+   we stamp it, then upgrade head applies all subsequent migrations.
+
+   Without that env var, exit 1 with a reconcile message.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -48,10 +53,13 @@ def main() -> None:
 
     has_alembic_table = "alembic_version" in existing
     has_alembic_row = False
+    current_rev = None
     if has_alembic_table:
         with engine.connect() as conn:
             row = conn.execute(text("SELECT version_num FROM alembic_version")).first()
-        has_alembic_row = row is not None
+        if row is not None:
+            has_alembic_row = True
+            current_rev = row[0]
 
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     cfg = Config(str(alembic_ini))
@@ -63,29 +71,55 @@ def main() -> None:
         return
 
     if has_alembic_row:
-        print(f"[migrate] Managed DB at revision {row[0]}. Running alembic upgrade head.")
+        print(f"[migrate] Managed DB at revision {current_rev}. Running alembic upgrade head.")
         command.upgrade(cfg, "head")
         return
 
     # Orphaned: app tables exist but alembic isn't tracking them.
     missing = expected - app_tables
+    extra = app_tables - expected
+    if extra:
+        # Not fatal — there might be platform tables we don't know about.
+        print(f"[migrate] Note: extra tables not declared in models: {sorted(extra)}")
+
+    # Explicit operator override: stamp the named revision, then upgrade.
+    # Use this when the schema is partial (typically baseline-only) and
+    # you want to bring it under alembic management at a specific point
+    # in history rather than head. Set on Railway as a service variable;
+    # remove after the deploy succeeds so re-runs don't keep re-stamping.
+    stamp_target = os.environ.get("MIGRATE_STAMP_REVISION", "").strip()
+    if stamp_target:
+        print(
+            f"[migrate] MIGRATE_STAMP_REVISION={stamp_target} set. "
+            f"Stamping that revision, then running upgrade head."
+        )
+        command.stamp(cfg, stamp_target)
+        command.upgrade(cfg, "head")
+        print(
+            "[OK] Stamp + upgrade complete. "
+            "Remove MIGRATE_STAMP_REVISION from the service variables now "
+            "so future deploys don't re-stamp."
+        )
+        return
+
     if missing:
         raise SystemExit(
             "[migrate] Cannot auto-adopt: the schema has app tables but "
             "is missing some that the current models declare:\n"
             f"  missing: {sorted(missing)}\n"
             f"  present: {sorted(app_tables)}\n"
-            "This indicates a partial schema, not an old create_all() snapshot. "
-            "Reconcile manually: either drop the partial tables and let "
-            "alembic upgrade head rebuild, or stamp to a specific older "
-            "revision that matches what's there."
+            "This is a partial schema (e.g. baseline migration committed "
+            "but later phases didn't). Two ways to reconcile:\n"
+            "  (a) Set MIGRATE_STAMP_REVISION on the service to the "
+            "      revision the existing tables correspond to, then "
+            "      redeploy. Subsequent migrations apply automatically.\n"
+            "  (b) Drop the partial tables in the DB console and "
+            "      redeploy — alembic upgrade head will rebuild from "
+            "      scratch (only safe if the tables hold no real data).\n"
+            "Common revisions: b54d2f396450 = baseline (tenants, "
+            "assessments, responses); see backend/alembic/versions/ for "
+            "the full revision list."
         )
-
-    extra = app_tables - expected
-    if extra:
-        # Not fatal — there might be platform tables (e.g. Postgres extensions)
-        # we don't know about. Just announce.
-        print(f"[migrate] Note: extra tables not declared in models: {sorted(extra)}")
 
     print(
         f"[migrate] Orphaned schema detected: {len(app_tables)} app tables "
